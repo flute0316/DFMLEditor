@@ -39,5 +39,6 @@ AGRP support two kind of read mode, including **Sequentially read** and **Random
 ### Code Generation
 User can click the **Generate** button to generate the read code corresponding to the selected DFML document. User. AGRP currently support code generation of C# and Python language. Code can be save by clicking **Save** button.
 
-<img align="center" src="./Image/Select program language of the code to generate.jpg.jpg">  
+<img align="center" src="./Image/Select program language of the code to generate.jpg">  
 <p align="center">Fig 5 Code Generation</p> 
+
