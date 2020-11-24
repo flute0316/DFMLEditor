@@ -1,0 +1,47 @@
+<dataformat name="Subcatchment Section" namespace="com.vge.swmm.input" mode="char" location="0 0,-1 -1">
+    <string description="Keyword"  value="[SUBCATCHMENTS]" location="0 0,0 -1"></string>
+    <cr></cr>
+    <semicolon  description="Annotator" location="1 0,1 2"></semicolon >
+    <string description="Subcatchment Name" value="Name" location="1 2,1 6"></string>
+    <tab></tab>
+    <string description="Rain Gage Name" value="Rgage" location="1 10,1 18"></string>
+    <tab></tab>
+    <string description="Node Name" value="OutID" location="1 24,1 30"></string>
+    <tab></tab>
+    <string description="Area of Subcatchment" value="Area" location="1 35,1 39"></string>
+    <tab></tab>
+    <string description="Percent Imperviousness" value="%Imperv" location="1 44,1 51"></string>
+    <tab></tab>
+    <string description="Characteristic Width" value="Width" location="1 56,1 61"></string>
+    <tab></tab>
+    <string description="Subcatchment Slope" value="Slope" location="1 66,1 71"></string>
+    <tab></tab>
+    <string description="Total Curb Length" value="Clength" location="1 76,1 83"></string>
+    <tab></tab>
+    <string description="Name of Snow Pack Object" value="Spack" location="1 88,1 -1"></string>
+    <tab></tab>
+    <cr></cr>
+    <semicolon  description="Annotator" location="2 0,2 2"></semicolon>
+    <string description="Separator" value="=" location="2 2,2 -1"></string>
+    <cr></cr>
+    <group description="Content" location="3 0,-1 -1">
+        <string description="Name" location="0 0,0 6"></string>
+        <tab></tab>
+        <string description="Rgage" location="0 10,0 18"></string>
+        <tab></tab>
+        <string description="OutID" location="0 24,0 30"></string>
+        <tab></tab>
+        <real description="Area" location="0 35,0 39"></real>
+        <tab></tab>
+        <real description="%Imperv" location="0 44,0 51"></real>
+        <tab></tab>
+        <real description="Width" location="0 56,0 61"></real>
+        <tab></tab>
+        <real description="Slope" location="0 66,0 71"></real>
+        <tab></tab>
+        <real description="Clength" location="0 76,0 83"></real>
+        <tab></tab>
+        <string description="Spack" location="0 88,0 -1"></string>
+        <cr></cr>
+    </group>
+</dataformat>

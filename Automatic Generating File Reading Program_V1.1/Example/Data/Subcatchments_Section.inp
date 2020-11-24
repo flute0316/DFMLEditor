@@ -1,0 +1,5 @@
+[SUBCATCHMENTS]
+;;Name    Raingage      Outlet     Area     %Imperv     Width     Slope     Clength     Spack
+;;===========================================================================================
+AREA1     GAGE1         NODE1      2        80.0        800.0     1.0       0                
+AREA2     GAGE1         NODE2      2        75.0        50.0      1.0       0                
