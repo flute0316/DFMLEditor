@@ -16,7 +16,7 @@ Automatic Generation of Reading Program(AGRP) is a kind of software which can bu
 <p align="center">Fig 1 The user interface of AGRP</p>  
 
 ### Load DFML document  
-Click the **Load** button to load the DFML document, wchich should be **XML** type. Multiple documents can be loaded simultaneously in the AGRP and user can select the documents by click item.
+Click the **Load** button to load the DFML document, wchich should be **XML** type. Multiple documents can be loaded simultaneously in the AGRP and user can select the documents by click item. User can remove documents by clicking the **Remove** button.
  
 <img align="center" src="./Image/Load DFML.jpg">  
 <p align="center">Fig 2 Load DFML</p>  
@@ -37,7 +37,7 @@ AGRP support two kind of read mode, including **Sequentially read** and **Random
 <p align="center">Fig 4 Read mode</p> 
 
 ### Code Generation
-User can click the **Generate** button to generate the read code corresponding to the selected DFML document. User. AGRP currently support code generation of C# and Python language.
+User can click the **Generate** button to generate the read code corresponding to the selected DFML document. User. AGRP currently support code generation of C# and Python language. Code can be save by clicking **Save** button.
 
 <img align="center" src="./Image/Select program language of the code to generate.jpg.jpg">  
 <p align="center">Fig 5 Code Generation</p> 
