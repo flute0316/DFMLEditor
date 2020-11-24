@@ -36,4 +36,8 @@ AGRP support two kind of read mode, including **Sequentially read** and **Random
 <img align="center" src="./Image/Double check the tree node can select the read mode.jpg">  
 <p align="center">Fig 4 Read mode</p> 
 
+### Code Generation
+User can click the **Generate** button to generate the read code corresponding to the selected DFML document. User. AGRP currently support code generation of C# and Python language.
 
+<img align="center" src="./Image/Select program language of the code to generate.jpg.jpg">  
+<p align="center">Fig 5 Code Generation</p> 
