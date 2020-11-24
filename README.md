@@ -28,9 +28,12 @@ the DFML document has been loaded and shown as a **DFML Tree**. **DFML Tree** ca
 <p align="center">Fig 3 DFML tree</p>  
 
 ### Read mode 
-AGRP support two kind of read mode, including **Sequentially read** and **Randomly read**. User can set the read mode by double click the tree nodes.
-#### Sequentially read
-**Sequentially read** means that AGRP and the code , which AGRP generate, will read data sequentially until read the end of data####Randomly read
-**Randomly read** need one parameter **Index** to indicate the data item will be read, and the data item's index depends on the order that they appear in the data. If **Index** is exceeds the file length, AGRP will raise a warning message
+AGRP support two kind of read mode, including **Sequentially read** and **Randomly read**. User can set the read mode by double click the tree nodes.  
+
+**Sequentially read** means that AGRP and the code , which AGRP generate, will read data sequentially until read the end of data.
+**Randomly read** need one parameter **Index** to indicate the data item will be read, and the data item's index depends on the order that they appear in the data.
+
 <img align="center" src="./Image/Double check the tree node can select the read mode.jpg">  
-<p align="center">Fig 4 Read mode</p>  
+<p align="center">Fig 4 Read mode</p> 
+
+
