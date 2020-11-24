@@ -8,15 +8,29 @@
 - **E-mail**: hud316@gmail.com  
 - **Program size**: about 784 KB.  
 # Guide
+
 ## Automatic Generation of Reading Program V1.1
-Automatic Generation of Reading Program(AGRP) is a kind of software which can build code and read data with guidance of DFML document. Following two examples will show how to use AGRP to generate read code and data reading of binary file and text file.
+### Overview  
+Automatic Generation of Reading Program(AGRP) is a kind of software which can build code and read data with guidance of DFML document. Following example will show how to use AGRP to generate read code and data reading of binary file and text file.  
+<img align="center" src="./Image/The user interface of AGRP.jpg">  
+<p align="center">Fig 1 The user interface of AGRP</p>  
 
-### Case study on binary files
-As shown in Fig 13, the DFML document has been loaded and shown as a DFML
-tree. The C# language has been used to generate codes. Moreover, all data items included
-in the shapefile are selected to be read. It can be easily seen that the data have been output
-in the user interface of the software. The corresponding values of the properties of point
-layer of 13 middle schools of Nanjing city, China, in 2008, are output. In regard to random
-reading, the codes for reading data are generated based on the selected nodes in the “DFML
+### Load DFML document  
+Click the **Load** button to load the DFML document, wchich should be **XML** type. Multiple documents can be loaded simultaneously in the AGRP and user can select the documents by click item.
+ 
+<img align="center" src="./Image/Load DFML.jpg">  
+<p align="center">Fig 2 Load DFML</p>  
 
+### DFML tree
+the DFML document has been loaded and shown as a **DFML Tree**. **DFML Tree** can help user understand the stracture easily and user can select data items by click the tree nodes.  
 
+<img align="center" src="./Image/Check the DFML tree to selecte the data to read.jpg">  
+<p align="center">Fig 3 DFML tree</p>  
+
+### Read mode 
+AGRP support two kind of read mode, including **Sequentially read** and **Randomly read**. User can set the read mode by double click the tree nodes.
+#### Sequentially read
+**Sequentially read** means that AGRP and the code , which AGRP generate, will read data sequentially until read the end of data####Randomly read
+**Randomly read** need one parameter **Index** to indicate the data item will be read, and the data item's index depends on the order that they appear in the data. If **Index** is exceeds the file length, AGRP will raise a warning message
+<img align="center" src="./Image/Double check the tree node can select the read mode.jpg">  
+<p align="center">Fig 4 Read mode</p>  
