@@ -50,4 +50,4 @@ User can read data by clicking the **Read File** button after DFML document was 
 <p align="center">Fig 6 Read file(Sequentially read)</p> 
 
 <img align="center" src="./Image/Click Read File button to read data(Randomly read).jpg">  
-<p align="center">Fig 6 Read file(Randomly read)</p> 
+<p align="center">Fig 7 Read file(Randomly read)</p> 
