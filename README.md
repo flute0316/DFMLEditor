@@ -10,7 +10,16 @@
 # Guide
 ## DFML Editor
 ### Overview
-The editor is designed to convert multiple types of file formats into DFML (Data Format Markup Language) uniform Markup documents.The editor provides a concise interface for users to generate DFML documents based on simple rules.Following example will show how to use DFML Document Editor to edit node’s information and  generate DFML document.
+The editor is designed to convert multiple types of file formats into Data Format Markup Language(DFML) uniform Markup documents.The editor provides a concise interface for users to generate DFML documents based on simple rules.Following example will show how to use DFML Document Editor to edit node’s information and  generate DFML document.  
+
+<img align="center" src="./Image/DFML Editor/DFML Editor user interface.jpg">  
+<p align="center">Fig 1 DFML Editor user interface</p>  
+
+### Add & Delete tree node.jpg
+When user right click the tree node, a menu wiil show and includes two functions **Add nodes** and **Delete nodes**. **Add nodes** can create and add a new node under the selected node. The main elements of Add nodes include: adding Group、 Integer、 String、Semicolon、Real、Tab、Cr. **Delete nodes** can delete the selected node 
+
+<img align="center" src="./Image/DFML Editor/Add & Delete tree node.jpg">  
+<p align="center">Fig 2 Add & Delete tree node</p>  
 
 ## Automatic Generation of Reading Program V1.1
 ### Overview  
