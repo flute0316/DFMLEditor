@@ -77,7 +77,7 @@ User can click the **Generate** button to generate the read code corresponding t
 User can read data by clicking the **Read File** button after DFML document was loaded. Base items will show as a key-value dict and group items will be parsed and show as a table.
 
 <img align="center" src="./Image/AGRP/Click Read File button to read data(Sequentially read).jpg">  
-<p align="center">Fig 6 Read file(Sequentially read)</p> 
+<p align="center">Fig 11 Read file(Sequentially read)</p> 
 
 <img align="center" src="./Image/AGRP/Click Read File button to read data(Randomly read).jpg">  
-<p align="center">Fig 7 Read file(Randomly read)</p> 
+<p align="center">Fig 12 Read file(Randomly read)</p> 
