@@ -15,11 +15,19 @@ The editor is designed to convert multiple types of file formats into Data Forma
 <img align="center" src="./Image/DFML Editor/DFML Editor user interface.jpg">  
 <p align="center">Fig 1 DFML Editor user interface</p>  
 
-### Add & Delete tree node.jpg
-When user right click the tree node, a menu wiil show and includes two functions **Add nodes** and **Delete nodes**. **Add nodes** can create and add a new node under the selected node. The main elements of Add nodes include: adding Group、 Integer、 String、Semicolon、Real、Tab、Cr. **Delete nodes** can delete the selected node 
+### Add & Delete Tree Node
+When user right click the tree node, a menu wiil show and includes two functions **Add nodes** and **Delete nodes**. **Add nodes** can create and add a new node under the selected node. The main elements of Add nodes include: adding Group、 Integer、 String、Semicolon、Real、Tab、Cr. **Delete nodes** can delete the selected node.
 
 <img align="center" src="./Image/DFML Editor/Add & Delete tree node.jpg">  
 <p align="center">Fig 2 Add & Delete tree node</p>  
+
+### Edit Node Attribute
+User can view the node' attribute by clicking node. Different type of node have different property item. Attribte will be editable after click the **Edit** button, and update after click the **Save** button.
+
+<img align="center" src="./Image/DFML Editor/Edit node attribute.jpg">  
+<p align="center">Fig 3 Edit node attribute</p>  
+
+### Save DFML document
 
 ## Automatic Generation of Reading Program V1.1
 ### Overview  
