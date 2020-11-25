@@ -30,8 +30,8 @@ User can view the node' attribute by clicking node. Different type of node has d
 ## Open DFML Document
 In addition to manual editing, DFML editor allows opening the local DFML document by clicking **Open** option. Local DFML document must be written in the **XML** language.  
 
-<img align="center" src="./Image/DFML Editor/Save DFML document.jpg">  
-<p align="center">Fig 4 Save DFML document</p>  
+<img align="center" src="./Image/DFML Editor/Open DFML document.jpg">  
+<p align="center">Fig 4 Open DFML document</p>  
 
 ## Save DFML Document
 User can easily save the DFML document by clicking **Save** option. DFML editor will save the DFML document with **XML** language.
