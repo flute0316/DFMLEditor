@@ -10,7 +10,7 @@
 
 # DFML Editor
 ## Overview
-The editor is designed to convert multiple types of file formats into Data Format Markup Language(DFML) uniform Markup documents. The editor provides a concise interface for users to generate DFML documents based on simple rules. Following examples will show how to use DFML Document Editor to edit the node’s information and generate DFML document.  
+The editor is designed to convert multiple types of file formats into Data Format Markup Language(DFML) uniform Markup documents. The editor provides a concise interface for users to generate DFML documents based on simple rules. Following examples will show how to use DFML Document Editor to edit the node’s information and generate a DFML document.  
 
 <img align="center" src="./Image/DFML Editor/DFML Editor user interface.jpg">  
 <p align="center">Fig 1 DFML Editor user interface</p>  
