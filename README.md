@@ -50,7 +50,7 @@ Automatic Generation of Reading Program(AGRP) is a kind of software which can bu
 Click the **Load** button to load the DFML document, which should be **XML** type. Multiple documents can be loaded simultaneously in the AGRP, and user can select the documents by click item. User can remove documents by clicking the **Remove** button.
  
 <img align="center" src="./Image/AGRP/Load DFML.jpg">  
-<p align="center">Fig 7 Load DFML</p>  
+<p align="center">Fig 7 Loading DFML</p>  
 
 ## DFML Tree
 the DFML document has been loaded and shown as a **DFML Tree**. **DFML Tree** can help the user understand the structure easily, and the user can select data items by click the tree nodes.  
