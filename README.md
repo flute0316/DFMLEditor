@@ -59,13 +59,13 @@ the DFML document has been loaded and shown as a **DFML Tree**. **DFML Tree** ca
 <p align="center">Fig 8 DFML tree</p>  
 
 ## Read Mode 
-AGRP support two kinds of reading mode, including **Sequentially read** and **Randomly read**. User can set the read mode by double click the tree nodes.  
+AGRP support two kinds of reading mode, including **Sequentially reading** and **Randomly reading**. User can set the read mode by double click the tree nodes.  
 
 **Sequentially read** means that AGRP and the code, which AGRP generate, will read data sequentially until reading the end of data.
 **Randomly read** need one parameter **Index** to indicate the data item will be read, and the data item's index depends on the order that they appear in the data.
 
 <img align="center" src="./Image/AGRP/Double check the tree node can select the read mode.jpg">  
-<p align="center">Fig 9 Read mode</p> 
+<p align="center">Fig 9 Reading mode</p> 
 
 ## Code Generation
 User can click the **Generate** button to generate the read code corresponding to the selected DFML document. User. AGRP currently support code generation of C# and Python language. Code can be saved by clicking **Save** button.
@@ -77,7 +77,7 @@ User can click the **Generate** button to generate the read code corresponding t
 User can read data by clicking the **Read File** button after DFML document was loaded. Base items will show as a key-value dict and group items will be parsed and show as a table.
 
 <img align="center" src="./Image/AGRP/Click Read File button to read data(Sequentially read).jpg">  
-<p align="center">Fig 11 Read file(Sequentially read)</p> 
+<p align="center">Fig 11 Read file(Sequentially reading)</p> 
 
 <img align="center" src="./Image/AGRP/Click Read File button to read data(Randomly read).jpg">  
-<p align="center">Fig 12 Read file(Randomly read)</p> 
+<p align="center">Fig 12 Read file(Randomly reading)</p> 
