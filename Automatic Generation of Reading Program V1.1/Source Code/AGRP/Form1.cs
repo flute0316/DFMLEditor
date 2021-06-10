@@ -25,8 +25,6 @@ namespace AGRP
         List<DFML> DFMLList = new List<DFML>();
         // Initialize a empty string type variable for read code content
         string code = string.Empty;
-        // 默认编程语言
-        string ProgrammingLanguage = "C#";
         XmlElement rootElement;
         // 目前支持的数据类型
         string[] basicDataType = { "string", "integer", "real", "boolean", "date", "time", "datetime", "path" };
@@ -73,7 +71,7 @@ namespace AGRP
                     initGenerateCodesProgressBar();
                     string programmingLanguage = ProgrammingLanguageListBox.SelectedItem.ToString();
                     // 根据选择的编程语言生成对应的代码
-                    switch (programmingLanguage)
+                    switch (this.ProgrammingLanguageListBox.SelectedItem.ToString())
                     {
                         case "C#":
                             GenerateCSharpReadProgram();
@@ -1230,7 +1228,7 @@ namespace AGRP
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog();
                 string ProgrammingLanguageExtension = string.Empty;
-                switch (ProgrammingLanguage)
+                switch (this.ProgrammingLanguageListBox.SelectedItem.ToString())
                 {
                     case "C#":
                         ProgrammingLanguageExtension = "cs";
