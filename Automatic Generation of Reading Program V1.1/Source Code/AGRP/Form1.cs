@@ -1,14 +1,15 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
-using System.Windows;
 using System.Windows.Forms;
 using System.Xml;
 using MessageBox = System.Windows.Forms.MessageBox;
+
 
 namespace AGRP
 {
@@ -25,6 +26,8 @@ namespace AGRP
         List<DFML> DFMLList = new List<DFML>();
         // Initialize a empty string type variable for read code content
         string code = string.Empty;
+        // Save Vars value
+        Hashtable VarsDict = new Hashtable();
         XmlElement rootElement;
         // 目前支持的数据类型
         string[] basicDataType = { "string", "integer", "real", "boolean", "date", "time", "datetime", "path" };
@@ -47,7 +50,7 @@ namespace AGRP
         private void GenerateButton_Click(object sender, EventArgs e)
         {
             // 选择编程语言
-            if (ProgrammingLanguageListBox.SelectedItem == null)
+            if (this.ProgrammingLanguageListBox.SelectedItem == null)
             {
                 MessageBox.Show("Programming Language has not been selected.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -516,7 +519,9 @@ namespace AGRP
                     locationAtt = element.GetAttribute("location");
                     // Parse the start and end location form locationAtt
                     startLocation = locationAtt.Split(',')[0];
+                    startLocation = DynamicCalculation(startLocation);
                     endLocation = locationAtt.Split(',')[1];
+                    endLocation = DynamicCalculation(endLocation);
                     if (elemName == "group")
                     {
                         // 该group中的每个子元素出现的间隔
@@ -613,22 +618,62 @@ namespace AGRP
         }
 
         /// <summary>
+        /// 解析使用表达式表示的值
+        /// </summary>
+        /// <param name="exp">表达式</param>
+        /// <returns>表达式对应的值</returns>
+        private string DynamicCalculation(string exp)
+        {
+            // 判断表达式中是否有运算符
+            var OperatorRegex = @"[+|-|*|/]";
+            Match mc = Regex.Match(exp, OperatorRegex);
+            if (mc.Length > 0)
+            {
+                // 替换表达式中的变量
+                foreach (string VarName in VarsDict.Keys)
+                {
+                    Regex rgx = new Regex(VarName);
+                    exp = rgx.Replace(exp, VarsDict[VarName].ToString());
+                }
+                // 计算
+                exp = CalcByCalcParenthesesExpression(exp);
+                return exp;
+            }
+            else
+                return exp;
+        }
+
+        public string CalcByCalcParenthesesExpression(string exp)
+        {
+            string result = new CalcParenthesesExpression().CalculateParenthesesExpression(exp);
+            return result;
+        }
+
+        /// <summary>
         /// 计算重复次数
         /// </summary>
         /// <param name="groupLength">group元素从开始位置到结束位置的长度</param>
         /// <param name="interval">该group中的每个子元素全部出现一次的长度</param>
         /// <returns></returns>
-        private int CalculateReptition(string groupLength, int interval)
+        private string CalculateReptition(string groupLength, int interval)
         {
             // 如果是文本的长度，包含了行的长度与列的长度，使用行距离计算重复次数
             if (groupLength.Contains(' '))
             {
                 int rowLength = int.Parse(groupLength.Split(' ')[0]);
-                return rowLength / interval;            
+                return (rowLength / interval).ToString();            
             }
             else
             {
-                return int.Parse(groupLength) / interval;
+                try
+                {
+                    return (int.Parse(groupLength) / interval).ToString();
+                }
+                catch
+                {
+                    return groupLength + "/" + interval.ToString();
+                }
+                
             }
 
         }
@@ -722,7 +767,19 @@ namespace AGRP
             // 二进制文件DFML的位置属性
             else
             {
-                return (int.Parse(endLocation) - int.Parse(startLocation)).ToString();
+                try
+                {
+                    int ParseEndLocation = int.Parse(endLocation);
+                    int ParseStartLocation = int.Parse(startLocation);
+                    return (ParseEndLocation - ParseStartLocation).ToString();
+                }
+                catch
+                {
+                    string ParseEndLocation = "(" + endLocation + ")";
+                    string ParseStartLocation = "(" + startLocation + ")";
+                    return ParseEndLocation + "-" + ParseStartLocation;
+                }
+                    
             }
         }
 

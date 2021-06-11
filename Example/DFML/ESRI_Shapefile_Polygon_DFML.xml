@@ -1,0 +1,20 @@
+<dataformat name="ESRI Shapefile Format" namespace="com.vge.esri" mode="byte" location="0,-1">
+    <integer location="0,4" value = "9994" description = "File Code" byteOrder ="bigEndian"></integer>
+    <group location="4,24" description="Unused Data">
+      <integer location = "0,4" value = "0" byteOrder="bigEndian" description="Unused" number="5"></integer>
+    </group>
+    <integer location = "24,28" description = "File Length" value = "Real Length of File" byteOrder = "bigEndian"></integer>
+    <integer location = "28,32" description = "Version" value = "1000" byteOrder = "littleEndian"> </integer>
+    <integer location = "32,36" description = "Geometry" value = "Geometry" byteOrder = "littleEndian"> </integer>
+    <group location="36,68" description="Box">
+      <real location = "0,8" byteOrder="littleEndian" description="Box" number="4"></real>
+    </group>
+    <integer location = "68,72" description = "NumParts" var = "NumParts" byteOrder = "littleEndian"> </integer>
+    <integer location = "72,76" description = "NumPoints" var = "NumPoints" byteOrder = "littleEndian"> </integer>
+    <group location="76,76+4*NumParts" description="Parts">
+      <integer location = "0,8" byteOrder="littleEndian" description="Parts" number="NumParts"></integer>
+    </group>
+    <group location="76+4*NumParts,-1" description="Points">
+      <integer location = "0,8" byteOrder="littleEndian" description="Points" number="NumPoints"></integer>
+    </group>
+</dataformat>
