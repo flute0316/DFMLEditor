@@ -6,7 +6,7 @@
     <integer location = "24,28" description = "File Length" value = "Real Length of File" byteOrder = "bigEndian"></integer>
     <integer location = "28,32" description = "Version" value = "1000" byteOrder = "littleEndian"> </integer>
     <integer location = "32,36" description = "Geometry" value = "Geometry" byteOrder = "littleEndian"> </integer>
-    <group location="36,68" description="Box">
+    <group location="36,92" description="Box">
       <real location = "0,8" byteOrder="littleEndian" description="Box" number="4"></real>
     </group>
     <integer location = "68,72" description = "NumParts" var = "NumParts" byteOrder = "littleEndian"> </integer>

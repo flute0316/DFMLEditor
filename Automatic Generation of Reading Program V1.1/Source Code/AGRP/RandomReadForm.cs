@@ -12,7 +12,7 @@ namespace AGRP
 {
     public partial class RandomReadForm : Form
     {
-        public int maxRepetition;
+        public string maxRepetition;
         public string indexResult;
         public RandomReadForm()
         {
@@ -34,21 +34,30 @@ namespace AGRP
 
         private void RandomlyRead()
         {
-            if (IndexBox.Text == string.Empty)
+            try
             {
-                MessageBox.Show("Please enter the index of data you want to read", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                int maxRepetitionInt = int.Parse(maxRepetition);
+                if (IndexBox.Text == string.Empty)
+                {
+                    MessageBox.Show("Please enter the index of data you want to read", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (maxRepetitionInt == -1 || int.Parse(IndexBox.Text) <= maxRepetitionInt && int.Parse(IndexBox.Text) >= 0)
+                {
+                    this.Close();
+                }
+                else if (int.Parse(IndexBox.Text) < 0)
+                {
+                    MessageBox.Show("The input index cannot be less than 0", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (int.Parse(IndexBox.Text) > maxRepetitionInt)
+                {
+                    MessageBox.Show("The input index cannot be greater than the maxRepetition", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-            else if (maxRepetition == -1 || int.Parse(IndexBox.Text) <= maxRepetition && int.Parse(IndexBox.Text) >= 0)
+            catch
             {
                 this.Close();
-            }
-            else if (int.Parse(IndexBox.Text) < 0)
-            {
-                MessageBox.Show("The input index cannot be less than 0", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            else if (int.Parse(IndexBox.Text) > maxRepetition)
-            {
-                MessageBox.Show("The input index cannot be greater than the maxRepetition", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                //MessageBox.Show("Can not parse the max repetition's value", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             indexResult = IndexBox.Text;
         }
