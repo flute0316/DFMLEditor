@@ -1,10 +1,14 @@
-﻿using System;
+﻿using Microsoft.CSharp;
+using System;
+using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
@@ -519,9 +523,7 @@ namespace AGRP
                     locationAtt = element.GetAttribute("location");
                     // Parse the start and end location form locationAtt
                     startLocation = locationAtt.Split(',')[0];
-                    startLocation = DynamicCalculation(startLocation);
                     endLocation = locationAtt.Split(',')[1];
-                    endLocation = DynamicCalculation(endLocation);
                     if (elemName == "group")
                     {
                         // 该group中的每个子元素出现的间隔
@@ -618,25 +620,73 @@ namespace AGRP
         }
 
         /// <summary>
+        /// Calculate the length of bytes or lines from start location to end location
+        /// </summary>
+        /// <param name="startLocation">Start location</param>
+        /// <param name="endLocation">End location</param>
+        /// <returns></returns>
+        private string CalculateLength(string startLocation, string endLocation)
+        {
+            // 文本文件DFML的位置属性
+            if (startLocation.Contains(' '))
+            {
+                int startRow = int.Parse(startLocation.Split(' ')[0]);
+                int endRow = int.Parse(endLocation.Split(' ')[0]);
+                int startCol = int.Parse(startLocation.Split(' ')[1]);
+                int endCol = int.Parse(endLocation.Split(' ')[1]);
+                int rowLength;
+                int colLength;
+                if (endCol != -1)
+                {
+                    rowLength = endRow - startRow;
+                    colLength = endCol - startCol;
+                }
+                else
+                {
+                    rowLength = endRow - startRow + 1;
+                    colLength = -1;
+                }
+                return string.Format("{0} {1}", rowLength, colLength);
+
+            }
+            // 二进制文件DFML的位置属性
+            else
+            {
+                try
+                {
+                    int ParseEndLocation = int.Parse(endLocation);
+                    int ParseStartLocation = int.Parse(startLocation);
+                    return (ParseEndLocation - ParseStartLocation).ToString();
+                }
+                catch
+                {
+                    string ParseEndLocation = "(" + endLocation + ")";
+                    string ParseStartLocation = "(" + startLocation + ")";
+                    return "(" + ParseEndLocation + "-" + ParseStartLocation + ")";
+                }
+
+            }
+        }
+
+        /// <summary>
         /// 解析使用表达式表示的值
         /// </summary>
         /// <param name="exp">表达式</param>
         /// <returns>表达式对应的值</returns>
         private string DynamicCalculation(string exp)
         {
-            // 判断表达式中是否有运算符
-            var OperatorRegex = @"[+|-|*|/]";
-            Match mc = Regex.Match(exp, OperatorRegex);
-            if (mc.Length > 0)
+            // 替换表达式中的变量
+            foreach (string VarName in VarsDict.Keys)
             {
-                // 替换表达式中的变量
-                foreach (string VarName in VarsDict.Keys)
-                {
-                    Regex rgx = new Regex(VarName);
-                    exp = rgx.Replace(exp, VarsDict[VarName].ToString());
-                }
+                Regex rgx = new Regex(VarName);
+                exp = rgx.Replace(exp, VarsDict[VarName].ToString());
+            }
+            // 判断表达式中是否有运算符
+            if (exp.Contains("+") | exp.Contains("-") | exp.Contains("*") | exp.Contains("/"))
+            {
                 // 计算
-                exp = CalcByCalcParenthesesExpression(exp);
+                exp = Calculate(exp).ToString();
+                // exp = CalcByCalcParenthesesExpression(exp);
                 return exp;
             }
             else
@@ -727,59 +777,24 @@ namespace AGRP
         }
 
         /// <summary>
-        /// Calculate the length of bytes or lines from start location to end location
-        /// </summary>
-        /// <param name="startLocation">Start location</param>
-        /// <param name="endLocation">End location</param>
-        /// <returns></returns>
-        private string CalculateLength(string startLocation, string endLocation)
-        {
-            // 文本文件DFML的位置属性
-            if (startLocation.Contains(' '))
-            {
-                int startRow = int.Parse(startLocation.Split(' ')[0]);
-                int endRow = int.Parse(endLocation.Split(' ')[0]);
-                int startCol = int.Parse(startLocation.Split(' ')[1]);
-                int endCol = int.Parse(endLocation.Split(' ')[1]);
-                int rowLength;
-                int colLength;
-                if (endCol != -1)
-                {
-                    rowLength = endRow - startRow;
-                    colLength = endCol - startCol;
-                }
-                else
-                {
-                    rowLength = endRow - startRow + 1;
-                    colLength = -1;
-                }
-                return string.Format("{0} {1}", rowLength, colLength);
-
-            }
-            // 二进制文件DFML的位置属性
-            else
-            {
-                return (int.Parse(endLocation) - int.Parse(startLocation)).ToString();
-            }
-        }
-
-
-        /// <summary>
         /// 生成C#的读取代码
         /// </summary>
         private void GenerateCSharpReadProgram()
         {
             // Defining the code structure of program reading file
             code = GenerateCSharpCodeStructure(rootElement);
+            GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
             // Generate Sequence of Basic Data Types
             //ConverDFMLToSequence(rootElement, linearSequence);
             // Acquire the value of "mode" attribute of rootElement
             string readMode = rootElement.GetAttribute("mode");
             string readMothodCode = string.Empty;
             // According to the read mode, generate the corresponding read mothod code by DFML XML document respectively
+            int retractLevel = 3;
             if (readMode == "byte")
             {
-                readMothodCode = GenerateCSharpByteReadMothodCode(linearSequence);
+                readMothodCode += GenerateCSharpByteReadMothodCode(this.DFMLTreeView.Nodes[0], retractLevel);
+                readMothodCode += new string(' ', retractLevel * 4) + "return objectList;" + Environment.NewLine;
             }
             else if (readMode == "char")
             {
@@ -788,6 +803,7 @@ namespace AGRP
             // Append readMothodCode to the data item read method in code
             code = string.Format(code, "{", "}", readMothodCode);
             CodeContentRichTextBox.Text = code;
+            GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
         }
 
         private void initGenerateCodesProgressBar()
@@ -953,96 +969,35 @@ namespace AGRP
         /// <summary>
         ///  generate the byte file C# read mothod code by linear sequence
         /// </summary>
-        /// <param name="linearSequence">用于存储XML元素的线性序列</param>
         /// <returns></returns>
-        private string GenerateCSharpByteReadMothodCode(List<XmlElement> linearSequence)
+        private string GenerateCSharpByteReadMothodCode(TreeNode node, int retractLevel)
         {
             string readMothodCode = string.Empty;
-            int retractLevel = 3;
             string elemName = string.Empty;
             string startReadLocation;
             string locationAtt = string.Empty;
             string readLength = "0";
-            int interval = 0;
-            int repetition = 0;
+            string interval;
+            string repetition;
 
-            foreach (XmlElement element in linearSequence)
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
+            // Acquire the "name" value of element
+            string nodeType = tag.nodeType;
+            XmlElement element = tag.nodeElem;
+            elemName = element.Name;
+            startReadLocation = tag.nodeStartLocation;
+            interval = tag.nodeInterval;
+            if (basicDataType.Contains(nodeType))
             {
-                // Acquire the "name" value of element
-                elemName = element.Name;
-                // Acquire the "startReadLocation" attribute value of element
-                startReadLocation = element.GetAttribute("startReadLocation");
-                // Acquire the "length" attribute value of element
-                readLength = element.GetAttribute("length");
-                // Acquire the "interval" attribute value of element
-                interval = int.Parse(element.GetAttribute("interval"));
-                // Acquire the "repetition" attribute value of element
-                repetition = int.Parse(element.GetAttribute("repetition"));
-                // random read
-                if (element.HasAttribute("targetIndex"))
+                if (tag.nodeIndex == "full read")
                 {
-                    int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-                    startReadLocation = (int.Parse(startReadLocation) + interval * (targetIndex - 1)).ToString();
-                    // 生成代码初始化startReadLocation
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0};", startReadLocation) + Environment.NewLine;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);" + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = autoReader.ReadBytes({0});", readLength) + Environment.NewLine;
-                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
-                    string byteOrder = element.GetAttribute("byteOrder");
-                    if (byteOrder == "bigEndian")
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + "Array.Reverse(bytes);" + Environment.NewLine;
-                    }
-                    switch (elemName)
-                    {
-                        case "string":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToString(bytes);" + Environment.NewLine;
-                            break;
-                        case "integer":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToInt32(bytes,0);" + Environment.NewLine;
-                            break;
-                        case "real":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToDouble(bytes,0);" + Environment.NewLine;
-                            break;
-                        case "boolean":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToBoolean(bytes,0);" + Environment.NewLine;
-                            break;
-                        case "date":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = DateTime.Parse(BitConverter.ToString(bytes,0));" + Environment.NewLine;
-                            break;
-                        case "time":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = TimeSpan.Parse(BitConverter.ToString(bytes,0));" + Environment.NewLine;
-                            break;
-                        case "datetime":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Convert.ToDateTime(BitConverter.ToString(bytes,0));" + Environment.NewLine;
-                            break;
-                        case "path":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @BitConverter.ToString(bytes,0);" + Environment.NewLine;
-                            break;
-                    }
-                    // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
-                }
-                // full read
-                else
-                {
-                    // 生成代码初始化startReadLocation与 repetition 变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0};", startReadLocation) + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("repetition = {0};", repetition) + Environment.NewLine;
-                    if (repetition == -1)
-                    {
-                        // 生成代码构建一个while循环，循环持续到读取到文件末尾
-                        readMothodCode += new string(' ', retractLevel * 4) + "while(startReadLocation < autoReader.BaseStream.Length)" + Environment.NewLine;
-                    }
-                    else
-                    {
-                        // 生成代码构建一个while循环，当repetition大于0时，循环继续
-                        readMothodCode += new string(' ', retractLevel * 4) + "while(repetition>0)" + Environment.NewLine;
-                    }
-                    // 开始生成循环内容的代码
+                    repetition = tag.nodeRepitition;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadLocation={0}; repetition<{1}; repetition--)", startReadLocation,repetition) + Environment.NewLine;
                     readMothodCode += new string(' ', retractLevel * 4) + "{" + Environment.NewLine;
                     retractLevel += 1;
+                    // 生成代码初始化startReadLocation
+                    // 生成代码使startReadLocation增加interval的值
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += ({0})*repetition;", interval) + Environment.NewLine;
                     // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
                     readMothodCode += new string(' ', retractLevel * 4) + "autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);" + Environment.NewLine;
                     readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = autoReader.ReadBytes({0});", readLength) + Environment.NewLine;
@@ -1079,19 +1034,23 @@ namespace AGRP
                             readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @BitConverter.ToString(bytes,0);" + Environment.NewLine;
                             break;
                     }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("var {0} = dataItem;",VarName) + Environment.NewLine;
+                    }
                     // 生成代码用于将数据加入到数据列表中
                     readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
-                    // 生成代码使startReadLocation增加interval的值
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += {0};", interval) + Environment.NewLine;
-                    // 生成代码使repetition减1
-                    readMothodCode += new string(' ', retractLevel * 4) + "repetition -= 1;" + Environment.NewLine;
-                    // 结束生成循环内容的代码
                     retractLevel -= 1;
-                    readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine; 
                 }
-                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
             }
-            readMothodCode += new string(' ', retractLevel * 4) + "return objectList;" + Environment.NewLine;
+            
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                readMothodCode += GenerateCSharpByteReadMothodCode(childNode, retractLevel);
+            }
+            
             return readMothodCode;
         }
 
@@ -1168,8 +1127,8 @@ namespace AGRP
             code += new string(' ', retractLevel * 4) + "private string readFilePath = string.Empty;" + Environment.NewLine;
             code += new string(' ', retractLevel * 4) + "private List<object> objectList = new List<object>();" + Environment.NewLine;
             code += new string(' ', retractLevel * 4) + "private int startReadLocation;" + Environment.NewLine;
-            code += new string(' ', retractLevel * 4) + "private int interval;" + Environment.NewLine;
             code += new string(' ', retractLevel * 4) + "private int repetition;" + Environment.NewLine;
+            code += new string(' ', retractLevel * 4) + "private int FileLength;" + Environment.NewLine;
             // Acquire the value of "mode" attribute of rootElement
             string readMode = rootElement.GetAttribute("mode");
             // According to the read mode, generate the corresponding read mothod code
@@ -1201,6 +1160,7 @@ namespace AGRP
                 // According to the retractLevel, append code into readMothodCode to read file with byte mode
                 code += new string(' ', retractLevel * 4) + "fs = new FileStream(readFilePath,FileMode.Open, FileAccess.Read);" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "autoReader = new BinaryReader(fs);" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "FileLength = (int) autoReader.BaseStream.Length;" + Environment.NewLine;
             }
             else if (readMode == "char")
             {
@@ -1348,7 +1308,6 @@ namespace AGRP
                 {
                     // initialize 
                     // 筛选出选中的节点
-                    ConverDFMLToSequence(rootElement, linearSequence);
                     UpdateSequence();
                     DataTableLayoutPanel.Controls.Clear();
                     DataTableLayoutPanel.RowCount = 1;
@@ -1357,10 +1316,13 @@ namespace AGRP
                     initReadProgressBar();
                     try
                     {
+                        TreeNode rootNode = this.DFMLTreeView.Nodes[0];
+                        TreeNodeTag rootNodeTag = (TreeNodeTag)rootNode.Tag;
+                        rootElement = rootNodeTag.nodeElem;
                         string readMode = rootElement.GetAttribute("mode");
                         if (readMode == "byte")
                         {
-                            ReadByteFile(readFilePath);
+                            ReadByteFile(readFilePath, rootNode);
                         }
                         else if (readMode == "char")
                         {
@@ -1485,27 +1447,18 @@ namespace AGRP
         /// 读取二进制文件
         /// </summary>
         /// <param name="readFilePath"></param>
-        private void ReadByteFile(string readFilePath)
+        private void ReadByteFile(string readFilePath,TreeNode rootNode)
         {
             FileStream fs = new FileStream(readFilePath, FileMode.Open, FileAccess.Read);
             BinaryReader autoReader = new BinaryReader(fs);
-            foreach (XmlElement element in linearSequence)
+            try
             {
-                List<object> dataList = new List<object>();
-                dataList = ReadByteData(element, autoReader);
-                string elementName = element.GetAttribute("description");
-                // header
-                if (element.HasAttribute("isHeaderElem") || elementName == "Unused")
-                {
-                    addToHeaderTable(elementName, dataList);
-                }
-                // content
-                else
-                {
-                    addToContentTable(elementName, dataList);
-                }
-                ReadDataProgressBar.Value += ReadDataProgressBar.Step;
+                VarsDict.Add("FileLength", (int)autoReader.BaseStream.Length);
             }
+            catch
+            {
+            }
+            ReadByteData(rootNode, autoReader);
         }
 
         /// <summary>
@@ -1617,6 +1570,23 @@ namespace AGRP
                 dataBox.BorderStyle = BorderStyle.None;
                 dataBox.Margin = new System.Windows.Forms.Padding(0);
                 row += 1;
+                if (row >= 100)
+                {
+                    dataBox.Text = "Too much data";
+                    DataContentTableLayoutPanel.RowCount = row + 1;
+                    RichTextBox rowNameBox = new RichTextBox();
+                    rowNameBox.ScrollBars = RichTextBoxScrollBars.None;
+                    rowNameBox.BorderStyle = BorderStyle.None;
+                    rowNameBox.Text = row.ToString();
+                    rowNameBox.Height = 20;
+                    rowNameBox.Width = 90;
+                    rowNameBox.AutoSize = true;
+                    rowNameBox.BorderStyle = BorderStyle.None;
+                    rowNameBox.BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
+                    rowNameBox.Margin = new System.Windows.Forms.Padding(0);
+                    DataContentTableLayoutPanel.Controls.Add(dataBox, col, row);
+                    break;
+                }
                 if (DataContentTableLayoutPanel.RowCount < row + 1)
                 {
                     DataContentTableLayoutPanel.RowCount = row + 1;
@@ -1703,76 +1673,46 @@ namespace AGRP
         /// <param name="element"></param>
         /// <param name="autoReader"></param>
         /// <returns></returns>
-        private List<object> ReadByteData(XmlElement element, BinaryReader autoReader)
+        private List<object> ReadByteData(TreeNode node, BinaryReader autoReader)
         {
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
             List<object> dataList = new List<object>();
-            // Acquire the "name" value of element
-            string elemName = element.Name;
-            // Acquire the "startReadLocation" attribute value of element
-            int startReadLocation = int.Parse(element.GetAttribute("startReadLocation"));
-            // Acquire the "length" attribute value of element
-            string readLength = element.GetAttribute("length");
-            // Acquire the value of "interval" attribute of element
-            int interval = int.Parse(element.GetAttribute("interval"));
-            // Acquire the value of "repetition" attribute of element
-            int repetition = int.Parse(element.GetAttribute("repetition"));
-            byte[] bytes;
-            object dataItem;
-            if (element.HasAttribute("targetIndex"))
+            if (node.Nodes.Count > 0)
             {
-            int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-            startReadLocation = startReadLocation + interval * (targetIndex - 1);
-                autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);
-                bytes = autoReader.ReadBytes(int.Parse(readLength));
-                string byteOrder = element.GetAttribute("byteOrder");
-                if (byteOrder == "bigEndian")
+                foreach (TreeNode childNode in node.Nodes)
                 {
-                    Array.Reverse(bytes);
+                    dataList.Add(ReadByteData(childNode, autoReader));
                 }
-                switch (elemName)
-                {
-                    case "string":
-                        dataItem = BitConverter.ToString(bytes);
-                        break;
-                    case "integer":
-                        dataItem = BitConverter.ToInt32(bytes, 0);
-                        break;
-                    case "real":
-                        dataItem = BitConverter.ToDouble(bytes, 0);
-                        break;
-                    case "boolean":
-                        dataItem = BitConverter.ToBoolean(bytes, 0);
-                        break;
-                    case "date":
-                        dataItem = BitConverter.ToString(bytes, 0);
-                        break;
-                    case "time":
-                        dataItem = TimeSpan.Parse(BitConverter.ToString(bytes, 0));
-                        break;
-                    case "datetime":
-                        dataItem = Convert.ToDateTime(BitConverter.ToString(bytes, 0));
-                        break;
-                    case "path":
-                        dataItem = @BitConverter.ToString(bytes, 0);
-                        break;
-                    default:
-                        dataItem = "unexpected data type";
-                        break;
-                }
-                dataList.Add(dataItem);
+                return dataList;
             }
             else
             {
-                while (startReadLocation < autoReader.BaseStream.Length && repetition != 0)
+                // Acquire the "name" value of element
+                string elemName = tag.nodeName;
+                // Acquire the "startReadLocation" attribute value of element
+                int startReadLocation = int.Parse(DynamicCalculation(tag.nodeStartLocation));
+                // Acquire the "length" attribute value of element
+                int readLength = int.Parse(DynamicCalculation(tag.nodeLength));
+
+                // Acquire the value of "interval" attribute of element
+                int interval = int.Parse(DynamicCalculation(tag.nodeInterval));
+
+                // Acquire the value of "repetition" attribute of element
+                float repetition = float.Parse(DynamicCalculation(tag.nodeRepitition));
+                byte[] bytes;
+                object dataItem;
+                if (tag.nodeIndex != "full read")
                 {
+                    int targetIndex = int.Parse(tag.nodeIndex);
+                    startReadLocation = startReadLocation + interval * (targetIndex - 1);
                     autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);
-                    bytes = autoReader.ReadBytes(int.Parse(readLength));
-                    string byteOrder = element.GetAttribute("byteOrder");
+                    bytes = autoReader.ReadBytes(readLength);
+                    string byteOrder = tag.nodeElem.GetAttribute("byteOrder");
                     if (byteOrder == "bigEndian")
                     {
                         Array.Reverse(bytes);
                     }
-                    switch (elemName)
+                    switch (tag.nodeType)
                     {
                         case "string":
                             dataItem = BitConverter.ToString(bytes);
@@ -1802,10 +1742,85 @@ namespace AGRP
                             dataItem = "unexpected data type";
                             break;
                     }
+                    if (tag.nodeElem.HasAttribute("VarName"))
+                    {
+                        try
+                        {
+                            VarsDict.Add(tag.nodeElem.GetAttribute("VarName"), dataItem);
+                        }
+                        catch
+                        {
+                            VarsDict["VarName"] = dataItem;
+                        }
+                    }
                     dataList.Add(dataItem);
-                    startReadLocation += interval;
-                    repetition -= 1;
                 }
+                else
+                {
+                    while (startReadLocation + readLength <= autoReader.BaseStream.Length && repetition != 0)
+                    {
+                        autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);
+                        bytes = autoReader.ReadBytes(readLength);
+                        string byteOrder = tag.nodeElem.GetAttribute("byteOrder");
+                        if (byteOrder == "bigEndian")
+                        {
+                            Array.Reverse(bytes);
+                        }
+                        switch (tag.nodeType)
+                        {
+                            case "string":
+                                dataItem = BitConverter.ToString(bytes);
+                                break;
+                            case "integer":
+                                dataItem = BitConverter.ToInt32(bytes, 0);
+                                break;
+                            case "real":
+                                dataItem = BitConverter.ToDouble(bytes, 0);
+                                break;
+                            case "boolean":
+                                dataItem = BitConverter.ToBoolean(bytes, 0);
+                                break;
+                            case "date":
+                                dataItem = BitConverter.ToString(bytes, 0);
+                                break;
+                            case "time":
+                                dataItem = TimeSpan.Parse(BitConverter.ToString(bytes, 0));
+                                break;
+                            case "datetime":
+                                dataItem = Convert.ToDateTime(BitConverter.ToString(bytes, 0));
+                                break;
+                            case "path":
+                                dataItem = @BitConverter.ToString(bytes, 0);
+                                break;
+                            default:
+                                dataItem = "unexpected data type";
+                                break;
+                        }
+                        if (tag.nodeElem.HasAttribute("VarName"))
+                        {
+                            try
+                            {
+                                VarsDict.Add(tag.nodeElem.GetAttribute("VarName"), dataItem);
+                            }
+                            catch
+                            {
+                                VarsDict["VarName"] = dataItem;
+                            }
+                        }
+                        dataList.Add(dataItem);
+                        startReadLocation += interval;
+                        repetition -= 1;
+                    }
+                }
+                if (dataList.Count == 1)
+                {
+                    addToHeaderTable(elemName, dataList);
+                }
+                else
+                {
+                    addToContentTable(elemName, dataList);
+                }
+                ReadDataProgressBar.Value += ReadDataProgressBar.Step;
             }
             return dataList;
         }
@@ -1841,7 +1856,6 @@ namespace AGRP
                 DFMLXmlObject.Load(DFMLFilePath);
                 // Acquire the root element of DFMLXmlObject
                 rootElement = DFMLXmlObject.DocumentElement;
-                ConverDFMLToSequence(rootElement, linearSequence);
                 DFMLTreeView.Nodes.Clear();
                 TreeNode treeNode = new TreeNode();
                 TreeNode childTreeNode = new TreeNode();
@@ -1854,7 +1868,9 @@ namespace AGRP
                 treeNode = DFMLTreeView.Nodes.Add(rootName);
                 treeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
                 treeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
-                treeNode.Tag = new TreeNodeTag(rootName, rootElement);
+                treeNode.Tag = new TreeNodeTag(rootElement);
+                TreeNodeTag rootTag = (TreeNodeTag)treeNode.Tag;
+                rootTag.nodeLength = "FileLength";
                 //treeNode.Name = rootElement.GetAttribute("ID");
                 foreach (XmlElement childElem in rootElement)
                 {
@@ -1868,13 +1884,62 @@ namespace AGRP
 
         private void CreatChildTree(TreeNode treeNode, XmlElement childElem)
         {
-            string chilElemDescription = childElem.GetAttribute("description");
             if (basicDataType.Contains(childElem.Name) || childElem.Name == "group")
             {
+                TreeNodeTag parentNodeTag = (TreeNodeTag)treeNode.Tag;
+                string chilElemDescription = childElem.GetAttribute("description");
                 TreeNode childTreeNode = treeNode.Nodes.Add(chilElemDescription);
                 //childTreeNode.Name = childElem.GetAttribute("ID");
-                childTreeNode.Tag = new TreeNodeTag(chilElemDescription, childElem);
+                
+                childTreeNode.Tag = new TreeNodeTag(childElem);
+                TreeNodeTag nodeTag = (TreeNodeTag)childTreeNode.Tag;
 
+                if (parentNodeTag.nodeType == "group")
+                {
+                    try
+                    {
+                        nodeTag.nodeStartLocation = (int.Parse(nodeTag.nodeStartLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
+                    }
+                    catch
+                    {
+                        nodeTag.nodeStartLocation = string.Format("({0})+({1})", nodeTag.nodeStartLocation, parentNodeTag.nodeStartLocation);
+                    }
+                    try
+                    {
+                        nodeTag.nodeEndLocation = (int.Parse(nodeTag.nodeEndLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
+                    }
+                    catch
+                    {
+                        nodeTag.nodeEndLocation = string.Format("({0})+({1})", nodeTag.nodeEndLocation, parentNodeTag.nodeStartLocation);
+                    }
+                }
+
+                string childElemRepitition = "1";
+                if (parentNodeTag.nodeName == "dataformat")
+                {
+                    childElemRepitition = "1";
+                }
+                else
+                {
+                    try
+                    {
+                        childElemRepitition = (int.Parse(parentNodeTag.nodeLength) / int.Parse(parentNodeTag.nodeInterval)).ToString();
+                    }
+                    catch
+                    {
+                        childElemRepitition = string.Format("({0}/ {1})", parentNodeTag.nodeLength, parentNodeTag.nodeInterval);
+                    }
+                }
+                foreach (XmlElement brotherElem in parentNodeTag.nodeElem.ChildNodes)
+                {
+                    string locationAtt = brotherElem.GetAttribute("location");
+                    if (locationAtt.Split(',')[1] == "-1")
+                    {
+                        childElemRepitition = "1";
+                        break;
+                      }
+                }
+                nodeTag.nodeRepitition = childElemRepitition;
                 if (chilElemDescription == string.Empty)
                 {
                     chilElemDescription = childElem.Name;
@@ -2037,6 +2102,7 @@ namespace AGRP
         private void UpdateChildTreeNode(TreeNode node, string targetIndex)
         {
             TreeNodeTag Tag = (TreeNodeTag) node.Tag;
+            Tag.nodeIndex = targetIndex;
             string nodeName = Tag.nodeName;
             XmlElement nodeElem = (XmlElement) Tag.nodeElem;
             if (targetIndex == "full read")
@@ -2090,28 +2156,30 @@ namespace AGRP
         /// 随机选择节点
         /// </summary>
         /// <param name="targetElement">被选中节点对应的xml元素</param>
-        private string randomSelectNode(XmlElement targetElement)
+        private string RandomSelectNode(TreeNode selectedNode)
         {
+            TreeNodeTag tag = (TreeNodeTag)selectedNode.Tag;
             RandomReadForm randomSelectNodeForm = new RandomReadForm();
             //在随机窗口中显示要素的信息
-            string description = targetElement.GetAttribute("description");
+            string description = tag.nodeName;
             addToRandomInfoTable("Description: " + description, randomSelectNodeForm);
             addToRandomInfoTable("", randomSelectNodeForm);
-            string elementType = targetElement.Name;
+            string elementType = tag.nodeElem.Name;
             addToRandomInfoTable("Type: " + elementType, randomSelectNodeForm);
-            int maxRepetition = int.Parse(targetElement.GetAttribute("repetition"));
-            randomSelectNodeForm.maxRepetition = maxRepetition;
-            if (maxRepetition > 0)
+            try
             {
-                addToRandomInfoTable("Occurrence times: " + maxRepetition, randomSelectNodeForm);
+                randomSelectNodeForm.maxRepetition = int.Parse(tag.nodeRepitition);
             }
-            else
+            catch
             {
-                addToRandomInfoTable("Occurrence times: " + "unknown", randomSelectNodeForm);
+                randomSelectNodeForm.maxRepetition = 1;
             }
+            addToRandomInfoTable("Occurrence times: " + randomSelectNodeForm.maxRepetition, randomSelectNodeForm);
+            
             randomSelectNodeForm.ShowDialog();
             // 随机读取的Index
             string targetIndex = randomSelectNodeForm.indexResult;
+            tag.nodeIndex = targetIndex;
             return targetIndex;
         }
 
@@ -2187,7 +2255,7 @@ namespace AGRP
                 XmlElement nodeElem = Tag.nodeElem;
                 if (nodeElem.Name != "dataformat")
                 {
-                    string targetIndex = randomSelectNode(nodeElem);
+                    string targetIndex = RandomSelectNode(e.Node);
                     if (targetIndex != string.Empty)
                     {
                         // 更新选中节点的所有子节点
@@ -2205,6 +2273,40 @@ namespace AGRP
         private void DFMLTreeView_MouseDown(object sender, MouseEventArgs e)
         {
             this.m_MouseClicks = e.Clicks;
+        }
+        public static object Calculate(string expression)
+        {
+            string className = "Calc";
+            string methodName = "Run";
+            expression = expression.Replace("/", "*1.0/");
+
+            //设置编译参数
+            CompilerParameters paras = new CompilerParameters();
+            paras.GenerateExecutable = false;
+            paras.GenerateInMemory = true;
+
+            //创建动态代码
+            StringBuilder classSource = new StringBuilder();
+            classSource.Append("public class " + className + "\n");
+            classSource.Append("{\n");
+            classSource.Append(" public object " + methodName + "()\n");
+            classSource.Append(" {\n");
+            classSource.Append(" return " + expression + ";\n");
+            classSource.Append(" }\n");
+            classSource.Append("}");
+
+            //编译代码
+            CompilerResults result = new CSharpCodeProvider().CompileAssemblyFromSource(paras, classSource.ToString());
+
+            //获取编译后的程序集。 
+            Assembly assembly = result.CompiledAssembly;
+
+            //动态调用方法。 
+            object eval = assembly.CreateInstance(className);
+            MethodInfo method = eval.GetType().GetMethod(methodName);
+            object reobj = method.Invoke(eval, null);
+            GC.Collect();
+            return reobj;
         }
 
         /// <summary>
@@ -2263,16 +2365,85 @@ namespace AGRP
     /// </summary>
     class TreeNodeTag
     {
+        public string nodeType;
         public string nodeName;
         public XmlElement nodeElem;
-        public TreeNodeTag(string nodeName, XmlElement nodeElem)
+        public string nodeLength;
+        public string nodeRepitition;
+        public string nodeInterval = "FileLength";
+        public string nodeIndex;
+        public string nodeStartLocation;
+        public string nodeEndLocation;
+        public TreeNodeTag(XmlElement nodeElem)
         {
-            this.nodeName = nodeName;
+            this.nodeType = nodeElem.Name;
+            this.nodeIndex = "full read";
+            this.nodeRepitition = "1";
+           
+            if (nodeElem.HasAttribute("description"))
+            {
+                this.nodeName = nodeElem.GetAttribute("description");
+            }
+            else
+            {
+                this.nodeName = "dataformat";
+            }
             this.nodeElem = nodeElem;
+            string locationAtt = nodeElem.GetAttribute("location");
+            // Parse the start and end location form locationAtt
+            this.nodeStartLocation = locationAtt.Split(',')[0];
+            this.nodeEndLocation = locationAtt.Split(',')[1];
+            this.nodeLength = CalculatLength(this.nodeStartLocation, this.nodeEndLocation);
+
+            if (nodeElem.HasAttribute("interval"))
+            {
+                this.nodeInterval = nodeElem.GetAttribute("interval");
+            }
+            else
+            {
+                if (nodeElem.Name == "dataformat")
+                {
+                    this.nodeInterval = "1";
+                }
+                else if ((nodeElem.Name == "group"))
+                {
+                    foreach (XmlElement childElem in nodeElem.ChildNodes)
+                    {
+                        this.nodeInterval = "0";
+                        string childLocation = childElem.GetAttribute("location");
+                        // Parse the start and end location form locationAtt
+                        string childnodeStartLocation = childLocation.Split(',')[0];
+                        string chilnodeEndLocation = childLocation.Split(',')[1];
+                        try
+                        {
+                            this.nodeInterval = (int.Parse(this.nodeInterval) + int.Parse(CalculatLength(childnodeStartLocation, chilnodeEndLocation))).ToString();
+                        }
+                        catch
+                        {
+                            this.nodeInterval = string.Format("({0}+{1})", this.nodeInterval, CalculatLength(childnodeStartLocation, chilnodeEndLocation));
+                        }
+                    }
+                }
+                else
+                {
+                    this.nodeInterval = this.nodeLength;
+                }
+            }
         }
-        public XmlElement GetElement()
+        public string CalculatLength(string startLocation, string endLocation)
         {
-            return this.nodeElem;
+            if (endLocation == "-1")
+            {
+                endLocation = "FileLength";
+            }
+            try
+            {
+                return (int.Parse(endLocation) - int.Parse(startLocation)).ToString();
+            }
+            catch
+            {
+                return string.Format("({0}-({1}))", endLocation, startLocation);
+            }
         }
     }
 }

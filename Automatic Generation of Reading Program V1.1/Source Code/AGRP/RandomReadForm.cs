@@ -14,6 +14,7 @@ namespace AGRP
     {
         public int maxRepetition;
         public string indexResult;
+        public TreeNode selectedNode;
         public RandomReadForm()
         {
             InitializeComponent();
