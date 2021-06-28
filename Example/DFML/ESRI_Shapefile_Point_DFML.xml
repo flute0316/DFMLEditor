@@ -1,6 +1,6 @@
 <dataformat name="ESRI Shapefile Format" namespace="com.vge.esri" mode="byte" location="0,-1">
     <integer location="0,4" value = "9994" description = "File Code" byteOrder ="bigEndian"></integer>
-    <group location="4,24" description="Unused Data">
+    <group location="4,24" description="Unused Data" interval="4">
       <integer location = "0,4" value = "0" byteOrder="bigEndian" description="Unused" number="5"></integer>
     </group>
     <integer location = "24,28" description = "File Length" value = "Real Length of File" byteOrder = "bigEndian"></integer>
@@ -14,7 +14,7 @@
     <real  location = "76,84" description = "Zmax" value = "Zmax" byteOrder = "littleEndian"></real>
     <real  location = "84,92" description = "Mmin" value = "Mmin" byteOrder = "littleEndian"></real>
     <real  location = "92,100" description = "Mmax" value = "Mmax" byteOrder = "littleEndian"></real>
-  <group location = "100,-1" description = "Point">
+  <group location = "100,-1" description = "Point" interval="28">
     <integer location = "0,4" description = "Record Number" byteOrder = "bigEndian"></integer>
     <integer location = "4,8" description = "Content Length" byteOrder = "bigEndian"></integer>
     <integer location = "8,12" description = "Geometry Type" byteOrder = "littleEndian"></integer>

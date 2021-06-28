@@ -19,8 +19,6 @@ namespace AGRP
 {
     public partial class Form1 : Form
     {
-        // A list type variable for store the linearized element
-        List<XmlElement> linearSequence = new List<XmlElement>();
         // The file path of the read program file
         string programFilePath = string.Empty;
         // The file path of the DFML document file
@@ -32,6 +30,7 @@ namespace AGRP
         string code = string.Empty;
         // Save Vars value
         Hashtable VarsDict = new Hashtable();
+        List<string> VarNameList = new List<string>();
         XmlElement rootElement;
         // 目前支持的数据类型
         string[] basicDataType = { "string", "integer", "real", "boolean", "date", "time", "datetime", "path" };
@@ -71,10 +70,7 @@ namespace AGRP
                     DFMLXmlObject.Load(DFMLFilePath);
                     //// Acquire the root element of DFMLXmlObject
                     rootElement = DFMLXmlObject.DocumentElement;
-                    linearSequence.Clear();
-                    // 筛选出选中的节点
-                    ConverDFMLToSequence(rootElement, linearSequence);
-                    UpdateSequence();
+
                     initGenerateCodesProgressBar();
                     string programmingLanguage = ProgrammingLanguageListBox.SelectedItem.ToString();
                     // 根据选择的编程语言生成对应的代码
@@ -104,138 +100,74 @@ namespace AGRP
         /// </summary>
         private void GeneratePythonReadProgram()
         {
+            // Defining the code structure of program reading file
             code = GeneratePythonCodeStructure(rootElement);
-            //ConverDFMLToSequence(rootElement, linearSequence);
-            //// 筛选出选中的节点
-            //UpdateSequence();
-            initGenerateCodesProgressBar();
+            GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
             // Acquire the value of "mode" attribute of rootElement
             string readMode = rootElement.GetAttribute("mode");
             string readMothodCode = string.Empty;
             // According to the read mode, generate the corresponding read mothod code by DFML XML document respectively
+            int retractLevel = 2;
             if (readMode == "byte")
             {
-                readMothodCode = GeneratePythonByteReadMothodCode(linearSequence);
+                readMothodCode += GeneratePythonByteReadMothodCode(this.DFMLTreeView.Nodes[0], retractLevel);
+                readMothodCode += new string(' ', retractLevel * 4) + "return objectList" + Environment.NewLine;
             }
             else if (readMode == "char")
             {
-                readMothodCode = GeneratePythonCharacterReadMothodCode(linearSequence);
+                readMothodCode += GeneratePythonCharacterReadMothodCode(this.DFMLTreeView.Nodes[0], retractLevel);
+                readMothodCode += new string(' ', retractLevel * 4) + "return objectList" + Environment.NewLine;
             }
             // Append readMothodCode to the data item read method in code
             code = string.Format(code, readMothodCode);
             CodeContentRichTextBox.Text = code;
+            try
+            {
+                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+            }
+            catch
+            { }
+
         }
 
         /// <summary>
         ///  Generate the character file python read mothod code by linear sequence
         /// </summary>
-        /// <param name="linearSequence">A list type variable for store the linearized element</param>
         /// <returns></returns>
-        private string GeneratePythonCharacterReadMothodCode(List<XmlElement> linearSequence)
+        private string GeneratePythonCharacterReadMothodCode(TreeNode node, int retractLevel)
         {
-
             string readMothodCode = string.Empty;
-            int retractLevel = 3;
             string elemName = string.Empty;
-            string startReadLocation = string.Empty;
+            string startReadLocation;
             string locationAtt = string.Empty;
-            string startLocation = string.Empty;
-            string endLocation = string.Empty;
-            string readLength = "0";
-            int interval = 0;
-            int repetition = 0;
-            foreach (XmlElement element in linearSequence)
+            string readLength;
+            string interval;
+            string repetition;
+
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
+            // Acquire the "name" value of element
+            string nodeName = tag.nodeName;
+            XmlElement element = tag.nodeElem;
+            elemName = element.Name;
+            startReadLocation = tag.nodeStartLocation;
+            // 开始读取的行数
+            string startReadRow = tag.nodeStartReadRow;
+            // 开始读取的列数
+            string startReadColumn = tag.nodeStartReadColumn;
+            string endReadColumn = tag.nodeEndReadColumn;
+            interval = tag.nodeInterval;
+            readLength = tag.nodeLength.Split(',')[1];
+            if (basicDataType.Contains(nodeName))
             {
-                // Acquire the "name" value of element
-                elemName = element.Name;
-                // Acquire the "startReadLocation" attribute value of element
-                startReadLocation = element.GetAttribute("startReadLocation");
-                // 开始读取的行数
-                string startReadRow = startReadLocation.Split(' ')[0];
-                // 开始读取的列数
-                string startReadColumn = startReadLocation.Split(' ')[1];
-                // Acquire the "length" attribute value of element
-                readLength = element.GetAttribute("length").Split(' ')[1];
-                // Acquire the "interval" attribute value of element
-                interval = int.Parse(element.GetAttribute("interval"));
-                // Acquire the "repetition" attribute value of element
-                repetition = int.Parse(element.GetAttribute("repetition"));
-                // random read
-                if (element.HasAttribute("targetIndex"))
+                if (tag.nodeIndex == "full read")
                 {
-                    int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-                    startReadRow = (int.Parse(startReadRow) + interval * (targetIndex - 1)).ToString();
-                    // 生成代码初始化startReadLocation变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0}", startReadRow) + Environment.NewLine;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "line = self.allLines[startReadLocation]" + Environment.NewLine;
-                    if (int.Parse(readLength) >= 0)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:{0}+{1}]", startReadColumn, readLength) + Environment.NewLine;
-                    }
-                    else if (int.Parse(readLength) == -1)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:]", startReadColumn, readLength) + Environment.NewLine;
-                    }
-                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
-                    switch (elemName)
-                    {
-                        case "string":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString" + Environment.NewLine;
-                            break;
-                        case "integer":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = int(dataString)" + Environment.NewLine;
-                            break;
-                        case "real":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = float(dataString)" + Environment.NewLine;
-                            break;
-                        case "boolean":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = bool(dataString)" + Environment.NewLine;
-                            break;
-                        case "date":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d').date()" + Environment.NewLine;
-                            break;
-                        case "time":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d').time()" + Environment.NewLine;
-                            break;
-                        case "datetime":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d'" + Environment.NewLine;
-                            break;
-                        case "path":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString" + Environment.NewLine;
-                            break;
-                    }
-                    // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "self.objectList.append(dataItem)" + Environment.NewLine;
-                }
-                // full read
-                else
-                {
-                    // 生成代码初始化startReadLocation与 repetition 变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0}", startReadRow) + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("repetition = {0}", repetition) + Environment.NewLine;
-                    if (repetition == -1)
-                    {
-                        // 生成代码构建一个while循环，循环持续到读取到文件末尾
-                        readMothodCode += new string(' ', retractLevel * 4) + "while startReadLocation < len(self.allLines):" + Environment.NewLine;
-                    }
-                    else
-                    {
-                        // 生成代码构建一个while循环，当repetition大于0时，循环继续
-                        readMothodCode += new string(' ', retractLevel * 4) + "while repetition != 0:" + Environment.NewLine;
-                    }
-                    // 开始生成循环内容的代码
+                    repetition = tag.nodeRepitition;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadRow = {0}", startReadRow) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "repetition = 0" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("while startReadRow < RowLength and repetition<{0}:", repetition) + Environment.NewLine;
                     retractLevel += 1;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "line = self.allLines[startReadLocation]" + Environment.NewLine;
-                    if (int.Parse(readLength) >= 0)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:{0}+{1}]", startReadColumn, readLength) + Environment.NewLine;
-                    }
-                    else if (int.Parse(readLength) == -1)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:]", startReadColumn, readLength) + Environment.NewLine;
-                    }
+                    readMothodCode += new string(' ', retractLevel * 4) + "line = self.allLines[startReadRow]" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:{1}]", startReadColumn, endReadColumn) + Environment.NewLine;
                     // 生成代码用于将读取的数据转化为elemName表示的数据类型
                     switch (elemName)
                     {
@@ -264,122 +196,106 @@ namespace AGRP
                             readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString" + Environment.NewLine;
                             break;
                     }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem", VarName) + Environment.NewLine;
+                    }
                     // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "self.objectList.append(dataItem)" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.append(dataItem)" + Environment.NewLine;
                     // 生成代码使startReadLocation增加interval的值
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += {0}", interval) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadRow += {0}", interval) + Environment.NewLine;
                     // 生成代码使repetition减1
-                    readMothodCode += new string(' ', retractLevel * 4) + "repetition -= 1" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "repetition += 1" + Environment.NewLine;
                     // 结束生成循环内容的代码
                     retractLevel -= 1;
                 }
-                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+                else
+                {
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadRow = {0}", startReadRow) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "line = self.allLines[startReadRow]" + Environment.NewLine;
+                    if (endReadColumn == "LineLength")
+                    {
+                        endReadColumn = "-1";
+                    }
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line[{0}:{1}]", startReadColumn, endReadColumn) + Environment.NewLine;
+                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
+                    switch (elemName)
+                    {
+                        case "string":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString" + Environment.NewLine;
+                            break;
+                        case "integer":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = int(dataString)" + Environment.NewLine;
+                            break;
+                        case "real":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = float(dataString)" + Environment.NewLine;
+                            break;
+                        case "boolean":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = bool(dataString)" + Environment.NewLine;
+                            break;
+                        case "date":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d').date()" + Environment.NewLine;
+                            break;
+                        case "time":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d').time()" + Environment.NewLine;
+                            break;
+                        case "datetime":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataString, '%Y-%m-%d'" + Environment.NewLine;
+                            break;
+                        case "path":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString" + Environment.NewLine;
+                            break;
+                    }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem", VarName) + Environment.NewLine;
+                    }
+                    // 生成代码用于将数据加入到数据列表中
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.append(dataItem)" + Environment.NewLine;
+                }
             }
-            readMothodCode += new string(' ', retractLevel * 4) + "return self.objectList" + Environment.NewLine;
+
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                readMothodCode += GeneratePythonCharacterReadMothodCode(childNode, retractLevel);
+            }
+
             return readMothodCode;
         }
 
         /// <summary>
         ///  Generate the byte file python read mothod code by linear sequence
         /// </summary>
-        /// <param name="linearSequence">用于存储XML元素的线性序列</param>
         /// <returns></returns>
-        private string GeneratePythonByteReadMothodCode(List<XmlElement> linearSequence)
+        private string GeneratePythonByteReadMothodCode(TreeNode node, int retractLevel)
         {
             string readMothodCode = string.Empty;
-            int retractLevel = 3;
             string elemName = string.Empty;
-            string startReadLocation = string.Empty;
+            string startReadLocation;
             string locationAtt = string.Empty;
-            string startLocation = string.Empty;
-            string endLocation = string.Empty;
-            string readLength = "0";
-            int interval = 0;
-            int repetition = 0;
-            foreach (XmlElement element in linearSequence)
+            string readLength;
+            string interval;
+            string repetition;
+
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
+            // Acquire the "name" value of element
+            string nodeName = tag.nodeName;
+            XmlElement element = tag.nodeElem;
+            elemName = element.Name;
+            startReadLocation = tag.nodeStartLocation;
+            interval = tag.nodeInterval;
+            readLength = tag.nodeLength;
+            if (basicDataType.Contains(nodeName))
             {
-                // Acquire the "name" value of element
-                elemName = element.Name;
-                // Acquire the "startReadLocation" attribute value of element
-                startReadLocation = element.GetAttribute("startReadLocation");
-                // Acquire the "length" attribute value of element
-                readLength = element.GetAttribute("length");
-                // Acquire the "interval" attribute value of element
-                interval = int.Parse(element.GetAttribute("interval"));
-                // Acquire the "repetition" attribute value of element
-                repetition = int.Parse(element.GetAttribute("repetition"));
-                // random read
-                if (element.HasAttribute("targetIndex"))
+                if (tag.nodeIndex == "full read")
                 {
-                    int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-                    startReadLocation = (int.Parse(startReadLocation) + interval * (targetIndex - 1)).ToString();
-                    // 生成代码初始化startReadLocation
+                    repetition = tag.nodeRepitition;
                     readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0}", startReadLocation) + Environment.NewLine;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "self.autoReader.seek(startReadLocation)" + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = self.autoReader.read({0})", readLength) + Environment.NewLine;
-                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
-                    string byteOrder = element.GetAttribute("byteOrder");
-                    if (byteOrder == "bigEndian")
-                    {
-                        byteOrder = ">";
-                    }
-                    else if (byteOrder == "littleEndian")
-                    {
-                        byteOrder = "<";
-                    }
-                    switch (elemName)
-                    {
-                        case "string":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
-                            break;
-                        case "integer":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}i',bytes)[0]", byteOrder) + Environment.NewLine;
-                            break;
-                        case "real":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}d',bytes)[0]", byteOrder) + Environment.NewLine;
-                            break;
-                        case "boolean":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}b',bytes)[0]", byteOrder) + Environment.NewLine;
-                            break;
-                        case "date":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d').date()" + Environment.NewLine;
-                            break;
-                        case "time":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d %H:%M:%S').time()" + Environment.NewLine;
-                            break;
-                        case "datetime":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d %H:%M:%S')" + Environment.NewLine;
-                            break; ;
-                        case "path":
-                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',dataItem)[0].decode()", byteOrder, readLength) + Environment.NewLine;
-                            break;
-                    }
-                    // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "self.objectList.append(dataItem)" + Environment.NewLine;
-                }
-                // full read
-                else
-                {
-                    // 生成代码初始化startReadLocation与 repetition 变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0}", startReadLocation) + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("repetition = {0}", repetition) + Environment.NewLine;
-                    if (repetition == -1)
-                    {
-                        // 生成代码构建一个while循环，循环持续到读取到文件末尾
-                        readMothodCode += new string(' ', retractLevel * 4) + "while startReadLocation < self.fileLength:" + Environment.NewLine; ;
-                    }
-                    else
-                    {
-                        // 生成代码构建一个while循环，当repetition大于0时，循环继续
-                        readMothodCode += new string(' ', retractLevel * 4) + "while startReadLocation < self.fileLength and repetition > 0:" + Environment.NewLine; ;
-                    }
-                    // 开始生成循环内容的代码
+                    readMothodCode += new string(' ', retractLevel * 4) + "repetition = 0" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("while startReadLocation < FileLength and repetition<{0}:",repetition) + Environment.NewLine;
                     retractLevel += 1;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
                     readMothodCode += new string(' ', retractLevel * 4) + "self.autoReader.seek(startReadLocation)" + Environment.NewLine;
                     readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = self.autoReader.read({0})", readLength) + Environment.NewLine;
                     // 生成代码用于将读取的数据转化为elemName表示的数据类型
@@ -422,18 +338,80 @@ namespace AGRP
                             readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',dataItem)[0].decode()", byteOrder, readLength) + Environment.NewLine;
                             break;
                     }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem", VarName) + Environment.NewLine;
+                    }
                     // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "self.objectList.append(dataItem)" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.append(dataItem)" + Environment.NewLine;
                     // 生成代码使startReadLocation增加interval的值
                     readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += {0}", interval) + Environment.NewLine;
                     // 生成代码使repetition减1
-                    readMothodCode += new string(' ', retractLevel * 4) + "repetition -= 1" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "repetition += 1" + Environment.NewLine;
                     // 结束生成循环内容的代码
                     retractLevel -= 1;
                 }
-                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+                else
+                {
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0} + {1} * {2}", startReadLocation,int.Parse(tag.nodeIndex) - 1,tag.nodeInterval) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "self.autoReader.seek(startReadLocation)" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = self.autoReader.read({0})", readLength) + Environment.NewLine;
+                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
+                    string byteOrder = element.GetAttribute("byteOrder");
+                    if (byteOrder == "bigEndian")
+                    {
+                        byteOrder = ">";
+                    }
+                    else if (byteOrder == "littleEndian")
+                    {
+                        byteOrder = "<";
+                    }
+                    switch (elemName)
+                    {
+                        case "string":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
+                            break;
+                        case "integer":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}i',bytes)[0]", byteOrder) + Environment.NewLine;
+                            break;
+                        case "real":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}d',bytes)[0]", byteOrder) + Environment.NewLine;
+                            break;
+                        case "boolean":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}b',bytes)[0]", byteOrder) + Environment.NewLine;
+                            break;
+                        case "date":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d').date()" + Environment.NewLine;
+                            break;
+                        case "time":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d %H:%M:%S').time()" + Environment.NewLine;
+                            break;
+                        case "datetime":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',bytes)[0].decode()", byteOrder, readLength) + Environment.NewLine;
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = datetime.datetime.strptime(dataItem, '%Y-%m-%d %H:%M:%S')" + Environment.NewLine;
+                            break; ;
+                        case "path":
+                            readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataItem = struct.unpack('{0}{1}i',dataItem)[0].decode()", byteOrder, readLength) + Environment.NewLine;
+                            break;
+                    }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem", VarName) + Environment.NewLine;
+                    }
+                    // 生成代码用于将数据加入到数据列表中
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.append(dataItem)" + Environment.NewLine;
+                }
             }
-            readMothodCode += new string(' ', retractLevel * 4) + "return self.objectList" + Environment.NewLine;
+
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                readMothodCode += GeneratePythonByteReadMothodCode(childNode, retractLevel);
+            }
+
             return readMothodCode;
         }
 
@@ -471,7 +449,6 @@ namespace AGRP
             {
                 // According to the retractLevel, append code into readMothodCode to read file with byte mode
                 code += new string(' ', retractLevel * 4) + "self.autoReader = open(filePath,\"rb\")" + Environment.NewLine;
-                code += new string(' ', retractLevel * 4) + "self.fileLength = len(self.autoReader.read())" + Environment.NewLine;
             }
             else if (readMode == "char")
             {
@@ -479,144 +456,23 @@ namespace AGRP
                 code += new string(' ', retractLevel * 4) + "self.autoReader = open(filePath,\"r\")" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "self.allLines = self.autoReader.readlines()" + Environment.NewLine;
             }
-            code += new string(' ', retractLevel * 4) + "self.objectList = list()" + Environment.NewLine;
+            
             // Set retract level as 1
             retractLevel = 1;
             // Append method definition into code, including access modifier, type of return, method name, method parameter
             code += new string(' ', retractLevel * 4) + "def dataItemRead(self):" + Environment.NewLine;
-            code += "{0}" + Environment.NewLine;
-            return code;
-        }
-
-        /// <summary>
-        /// Generate Sequence of Basic Data Type
-        /// </summary>
-        /// <param name="rootElement">The root element of DFML document </param>
-        /// <param name="linearSequence">用于存储XML元素的线性序列</param>
-        private void ConverDFMLToSequence(XmlElement rootElement, List<XmlElement> linearSequence)
-        {
-            linearSequence.Clear();
-            // 为了与Tree中的节点对应，为每个节点添加一个唯一的TAG
-            // int startID = 0;
-            // IDElements(rootElement, ref startID);
-
-            string elemName = string.Empty;
-            string locationAtt = string.Empty;
-            string startLocation = string.Empty;
-            string endLocation = string.Empty;
-            string groupLength = string.Empty;
-            string elemLength = string.Empty;
-            string childLength = string.Empty;
-            int interval = 0;
-            int repetition = 0;
-            string childLocationAtt = string.Empty;
-            string childStartLocation = string.Empty;
-            string childEndLocation = string.Empty;
-            string childStartReadLoc = string.Empty;
-            foreach (XmlElement element in rootElement)
+            if (readMode == "byte")
             {
-                // Acquire the name value of element
-                elemName = element.Name;
-                if (basicDataType.Contains(elemName) || elemName == "group")
-                {
-                    // Acquire the "location" attribute value of element
-                    locationAtt = element.GetAttribute("location");
-                    // Parse the start and end location form locationAtt
-                    startLocation = locationAtt.Split(',')[0];
-                    endLocation = locationAtt.Split(',')[1];
-                    if (elemName == "group")
-                    {
-                        // 该group中的每个子元素出现的间隔
-                        interval = CalculateInterval(element);
-                        // 如果结束位置是文件末尾
-                        if (endLocation == "-1" || endLocation.Split(' ')[0] == "-1")
-                        {
-                            // 该group元素直到文件末尾才结束
-                            groupLength = endLocation;
-                            // 该group的子元素重复出现的次数取决于文件长度
-                            repetition = -1;
-                        }
-                        else
-                        {
-                            // 该group元素从开始位置到结束位置的长度
-                            groupLength = CalculateLength(startLocation, endLocation);
-                            // group中的子元素重复出现的次数
-                            repetition = CalculateReptition(groupLength, interval);
-                        }
-                        element.SetAttribute("repetition", repetition.ToString());
-                        // 为group中的每个子元素赋值
-                        foreach (XmlElement childElem in element)
-                        {
-                            // Acquire the name value of childElem
-                            string childElemName = childElem.Name;
-                            // if child element is Basic Data Type
-                            if (basicDataType.Contains(childElemName))
-                            {
-                                // Acquire the "location" attribute value of childElem
-                                childLocationAtt = childElem.GetAttribute("location");
-                                // Parse the start location from childLocationAtt
-                                childStartLocation = childLocationAtt.Split(',')[0];
-                                // Parse the end location from childLocationAtt
-                                childEndLocation = childLocationAtt.Split(',')[1];
-                                childStartReadLoc = CalculateStartLocation(startLocation, childStartLocation);
-                                childLength = CalculateLength(childStartLocation, childEndLocation);
-                                // Add childStartReadLoc to attributes of childElem as "startReadLocation"
-                                childElem.SetAttribute("startReadLocation", childStartReadLoc);
-                                // Add childLength to attributes of childElem as "length"
-                                childElem.SetAttribute("length", childLength.ToString());
-                                // Add interval to attributes of childElem as "interval"
-                                childElem.SetAttribute("interval", interval.ToString());
-                                // Add repetition to attributes of childElem as "repetition"
-                                childElem.SetAttribute("repetition", repetition.ToString());
-                                // Add childElem to linearSequence
-                                linearSequence.Add(childElem);
-                            }
-                        }
-
-                    }
-                    else if (basicDataType.Contains(elemName))
-                    {
-                        // 该元素不会再次出现
-                        interval = 0;
-                        // 该元素只出现一次
-                        repetition = 1;
-                        elemLength = CalculateLength(startLocation, endLocation);
-                        // Add startLocation to attributes of element as "startReadLocation"
-                        element.SetAttribute("startReadLocation", startLocation);
-                        // Add elemLength to attributes of element as "length"
-                        element.SetAttribute("length", elemLength.ToString());
-                        // Add interval to attributes of element as "interval"
-                        element.SetAttribute("repetition", repetition.ToString());
-                        // Add repetition to attributes of element as "repetition"
-                        element.SetAttribute("interval", interval.ToString());
-                        // Add isHeaderElem to attributes of childElem as "isHeaderElem"
-                        element.SetAttribute("isHeaderElem", "true");
-                        // Add element to linearSequence
-                        linearSequence.Add(element);
-                    }
-                }
+                code += new string(' ', (retractLevel + 1) * 4) + "FileLength = len(self.autoReader.read())" + Environment.NewLine;
+            }
+            else if (readMode == "char")
+            {
+                code += new string(' ', (retractLevel + 1) * 4) + "RowLength = len(self.allLines)" + Environment.NewLine;
             }
 
-            //foreach (XmlElement node in linearSequence)
-            //{
-            //    CodeContentRichTextBox.Text += "<";
-            //    CodeContentRichTextBox.Text += node.Name;
-            //    CodeContentRichTextBox.Text += " ";
-            //    foreach (XmlAttribute att in node.Attributes)
-            //    {
-            //        if (att.Name != "ID" && att.Name != "groupName")
-            //        {
-            //            CodeContentRichTextBox.Text += att.Name;
-            //            CodeContentRichTextBox.Text += "=";
-            //            CodeContentRichTextBox.Text += "\"";
-            //            CodeContentRichTextBox.Text += att.Value;
-            //            CodeContentRichTextBox.Text += "\"";
-            //            CodeContentRichTextBox.Text += " ";
-            //        }
-            //    }
-            //    CodeContentRichTextBox.Text += ">";
-            //    CodeContentRichTextBox.Text += "\n";
-            //}
+            code += new string(' ', (retractLevel + 1) * 4) + "objectList = list()" + Environment.NewLine;
+            code += "{0}" + Environment.NewLine;
+            return code;
         }
 
         /// <summary>
@@ -784,8 +640,6 @@ namespace AGRP
             // Defining the code structure of program reading file
             code = GenerateCSharpCodeStructure(rootElement);
             GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
-            // Generate Sequence of Basic Data Types
-            //ConverDFMLToSequence(rootElement, linearSequence);
             // Acquire the value of "mode" attribute of rootElement
             string readMode = rootElement.GetAttribute("mode");
             string readMothodCode = string.Empty;
@@ -798,12 +652,24 @@ namespace AGRP
             }
             else if (readMode == "char")
             {
-                readMothodCode = GenerateCSharpCharacterReadMothodCode(linearSequence);
+                readMothodCode += GenerateCSharpCharacterReadMothodCode(this.DFMLTreeView.Nodes[0], retractLevel);
+                readMothodCode += new string(' ', retractLevel * 4) + "return objectList;" + Environment.NewLine;
+            }
+            string defineCode = "";
+            foreach (string varname in VarNameList)
+            {
+                defineCode += new string(' ', 2 * 4) + string.Format(" private int {0};", varname) + Environment.NewLine;
             }
             // Append readMothodCode to the data item read method in code
-            code = string.Format(code, "{", "}", readMothodCode);
+            code = string.Format(code, "{", "}", readMothodCode, defineCode);
             CodeContentRichTextBox.Text = code;
-            GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+            try
+            {
+                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+            }
+            catch
+            { }
+            
         }
 
         private void initGenerateCodesProgressBar()
@@ -812,117 +678,48 @@ namespace AGRP
             GenerateCodesProgressBar.Value = 0;
             GenerateCodesProgressBar.Maximum = 100;
             GenerateCodesProgressBar.Minimum = 0;
-            GenerateCodesProgressBar.Step = 100 / linearSequence.Count();
+            GenerateCodesProgressBar.Step = 10;
         }
 
         /// <summary>
         ///  generate the character file C# read mothod code by linear sequence
         /// </summary>
-        /// <param name="linearSequence">用于存储XML元素的线性序列</param>
         /// <returns></returns>
-        private string GenerateCSharpCharacterReadMothodCode(List<XmlElement> linearSequence)
+        private string GenerateCSharpCharacterReadMothodCode(TreeNode node, int retractLevel)
         {
             string readMothodCode = string.Empty;
-            int retractLevel = 3;
             string elemName = string.Empty;
-            string startReadLocation = string.Empty;
-            string readLength = "0";
-            int interval = 0;
-            int repetition = 0;
-            foreach (XmlElement element in linearSequence)
+            string startReadLocation;
+            string locationAtt = string.Empty;
+            string readLength;
+            string interval;
+            string repetition;
+
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
+            // Acquire the "name" value of element
+            string nodeName = tag.nodeName;
+            XmlElement element = tag.nodeElem;
+            elemName = element.Name;
+            startReadLocation = tag.nodeStartLocation;
+            // 开始读取的行数
+            string startReadRow = tag.nodeStartReadRow;
+            // 开始读取的列数
+            string startReadColumn = tag.nodeStartReadColumn;
+            interval = tag.nodeInterval;
+            readLength = tag.nodeLength.Split(',')[1];
+            if (basicDataType.Contains(nodeName))
             {
-                // Acquire the "name" value of element
-                elemName = element.Name;
-                // Acquire the "startReadLocation" attribute value of element
-                startReadLocation = element.GetAttribute("startReadLocation");
-                // 开始读取的行数
-                string startReadRow = startReadLocation.Split(' ')[0];
-                // 开始读取的列数
-                string startReadColumn = startReadLocation.Split(' ')[1];
-                // Acquire the "length" attribute value of element
-                readLength = element.GetAttribute("length").Split(' ')[1];
-                // Acquire the "interval" attribute value of element
-                interval = int.Parse(element.GetAttribute("interval"));
-                // Acquire the "repetition" attribute value of element
-                repetition = int.Parse(element.GetAttribute("repetition"));
-                // random read
-                if (element.HasAttribute("targetIndex"))
+                if (tag.nodeIndex == "full read")
                 {
-                    int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-                    startReadRow = (int.Parse(startReadRow) + interval * (targetIndex - 1)).ToString();
-                    // 生成代码初始化startReadLocation变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0};", startReadRow) + Environment.NewLine;
-                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "line = allLines[startReadLocation];" + Environment.NewLine;
-                    if (int.Parse(readLength) >= 0)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},{1});", startReadColumn, readLength) + Environment.NewLine;
-                    }
-                    else if (int.Parse(readLength) == -1)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},line.Length-{0});", startReadColumn) + Environment.NewLine;
-                    }
-                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
-                    switch (elemName)
-                    {
-                        case "string":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString;" + Environment.NewLine;
-                            break;
-                        case "integer":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = int.Parse(dataString);" + Environment.NewLine;
-                            break;
-                        case "real":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = double.Parse(dataString);" + Environment.NewLine;
-                            break;
-                        case "boolean":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Boolean.Parse(dataString);" + Environment.NewLine;
-                            break;
-                        case "date":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = DateTime.Parse(dataString);" + Environment.NewLine;
-                            break;
-                        case "time":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = TimeSpan.Parse(dataString);" + Environment.NewLine;
-                            break;
-                        case "datetime":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Convert.ToDateTime(dataString);" + Environment.NewLine;
-                            break;
-                        case "path":
-                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @dataString;" + Environment.NewLine;
-                            break;
-                    }
-                    // 生成代码用于将数据加入到数据列表中
-                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
-                }
-                // full read
-                else
-                {
-                    // 生成代码初始化startReadLocation与 repetition 变量
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation = {0};", startReadRow) + Environment.NewLine;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("repetition = {0};", repetition) + Environment.NewLine;
-                    if (repetition == -1)
-                    {
-                        // 生成代码构建一个while循环，循环持续到读取到文件末尾
-                        readMothodCode += new string(' ', retractLevel * 4) + "while(startReadLocation < allLines.Length)" + Environment.NewLine;
-                    }
-                    else
-                    {
-                        // 生成代码构建一个while循环，当repetition大于0时，循环继续
-                        readMothodCode += new string(' ', retractLevel * 4) + "while(repetition>0)" + Environment.NewLine;
-                    }
-                    // 开始生成循环内容的代码
+                    repetition = tag.nodeRepitition;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadRow={0}; repetition<{1} && startReadRow<=RowLength; repetition++)", startReadRow, repetition) + Environment.NewLine;
                     readMothodCode += new string(' ', retractLevel * 4) + "{" + Environment.NewLine;
                     retractLevel += 1;
+                    // 生成代码初始化startReadLocation
                     // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
-                    readMothodCode += new string(' ', retractLevel * 4) + "line = allLines[startReadLocation];" + Environment.NewLine;
-                    if (int.Parse(readLength) >= 0)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},{1});", startReadColumn, readLength) + Environment.NewLine;
-                    }
-                    else if (int.Parse(readLength) == -1)
-                    {
-                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},line.Length-{0});", startReadColumn) + Environment.NewLine;
-                    }
-                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
+                    readMothodCode += new string(' ', retractLevel * 4) + "line = allLines[startReadRow];" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "LineLength = line.Length;" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},{1});", startReadColumn, readLength) + Environment.NewLine;
                     switch (elemName)
                     {
                         case "string":
@@ -949,20 +746,78 @@ namespace AGRP
                         case "path":
                             readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @dataString;" + Environment.NewLine;
                             break;
+                    }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem;", VarName) + Environment.NewLine;
+                        VarNameList.Add(VarName);
                     }
                     // 生成代码用于将数据加入到数据列表中
                     readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
                     // 生成代码使startReadLocation增加interval的值
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += {0};", interval) + Environment.NewLine;
-                    // 生成代码使repetition减1
-                    readMothodCode += new string(' ', retractLevel * 4) + "repetition -= 1;" + Environment.NewLine;
-                    // 结束生成循环内容的代码
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadRow += {0};", interval) + Environment.NewLine;
                     retractLevel -= 1;
                     readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine;
                 }
-                GenerateCodesProgressBar.Value += GenerateCodesProgressBar.Step;
+                else
+                {
+                    repetition = "1";
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadRow={0}; repetition<{1} && startReadRow<=RowLength; repetition++)", startReadRow, repetition) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "{" + Environment.NewLine;
+                    retractLevel += 1;
+                    // 生成代码初始化startReadLocation
+                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
+                    readMothodCode += new string(' ', retractLevel * 4) + "line = allLines[startReadRow];" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "LineLength = line.Length;" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("dataString = line.Substring({0},{1});", startReadColumn, readLength) + Environment.NewLine;
+                    switch (elemName)
+                    {
+                        case "string":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = dataString;" + Environment.NewLine;
+                            break;
+                        case "integer":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = int.Parse(dataString);" + Environment.NewLine;
+                            break;
+                        case "real":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = double.Parse(dataString);" + Environment.NewLine;
+                            break;
+                        case "boolean":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Boolean.Parse(dataString);" + Environment.NewLine;
+                            break;
+                        case "date":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = DateTime.Parse(dataString);" + Environment.NewLine;
+                            break;
+                        case "time":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = TimeSpan.Parse(dataString);" + Environment.NewLine;
+                            break;
+                        case "datetime":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Convert.ToDateTime(dataString);" + Environment.NewLine;
+                            break;
+                        case "path":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @dataString;" + Environment.NewLine;
+                            break;
+                    }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("{0} = dataItem;", VarName) + Environment.NewLine;
+                        VarNameList.Add(VarName);
+                    }
+                    // 生成代码用于将数据加入到数据列表中
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
+                    // 生成代码使startReadLocation增加interval的值
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadRow += {0};", interval) + Environment.NewLine;
+                    retractLevel -= 1;
+                    readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine;
+                }
             }
-            readMothodCode += new string(' ', retractLevel * 4) + "return objectList;" + Environment.NewLine;
+
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                readMothodCode += GenerateCSharpCharacterReadMothodCode(childNode, retractLevel);
+            }
+
             return readMothodCode;
         }
 
@@ -982,17 +837,17 @@ namespace AGRP
 
             TreeNodeTag tag = (TreeNodeTag)node.Tag;
             // Acquire the "name" value of element
-            string nodeType = tag.nodeType;
+            string nodeName = tag.nodeName;
             XmlElement element = tag.nodeElem;
             elemName = element.Name;
             startReadLocation = tag.nodeStartLocation;
             interval = tag.nodeInterval;
-            if (basicDataType.Contains(nodeType))
+            if (basicDataType.Contains(nodeName))
             {
                 if (tag.nodeIndex == "full read")
                 {
                     repetition = tag.nodeRepitition;
-                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadLocation={0}; repetition<{1}; repetition--)", startReadLocation,repetition) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadLocation={0}; repetition<{1} && startReadLocation<=FileLength; repetition++)", startReadLocation,repetition) + Environment.NewLine;
                     readMothodCode += new string(' ', retractLevel * 4) + "{" + Environment.NewLine;
                     retractLevel += 1;
                     // 生成代码初始化startReadLocation
@@ -1038,11 +893,69 @@ namespace AGRP
                     {
                         string VarName = element.GetAttribute("VarName");
                         readMothodCode += new string(' ', retractLevel * 4) + string.Format("var {0} = dataItem;",VarName) + Environment.NewLine;
+                        VarNameList.Add(VarName);
                     }
                     // 生成代码用于将数据加入到数据列表中
                     readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
                     retractLevel -= 1;
                     readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine; 
+                }
+                else
+                {
+                    repetition = "1";
+                    startReadLocation = string.Format("{0} + {1} * ({2} - 1)", startReadLocation, tag.nodeInterval, tag.nodeIndex) ; 
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("for (repetition=0,startReadLocation={0}; repetition<{1}; repetition++)", startReadLocation, repetition) + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + "{" + Environment.NewLine;
+                    retractLevel += 1;
+                    // 生成代码初始化startReadLocation
+                    // 生成代码使startReadLocation增加interval的值
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("startReadLocation += ({0})*repetition;", interval) + Environment.NewLine;
+                    // 生成代码用于从startReadLocation位置开始读取readLength长度的数据
+                    readMothodCode += new string(' ', retractLevel * 4) + "autoReader.BaseStream.Seek(startReadLocation, SeekOrigin.Begin);" + Environment.NewLine;
+                    readMothodCode += new string(' ', retractLevel * 4) + string.Format("bytes = autoReader.ReadBytes({0});", readLength) + Environment.NewLine;
+                    // 生成代码用于将读取的数据转化为elemName表示的数据类型
+                    string byteOrder = element.GetAttribute("byteOrder");
+                    if (byteOrder == "bigEndian")
+                    {
+                        readMothodCode += new string(' ', retractLevel * 4) + "Array.Reverse(bytes);" + Environment.NewLine;
+                    }
+                    switch (elemName)
+                    {
+                        case "string":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToString(bytes);" + Environment.NewLine;
+                            break;
+                        case "integer":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToInt32(bytes,0);" + Environment.NewLine;
+                            break;
+                        case "real":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToDouble(bytes,0);" + Environment.NewLine;
+                            break;
+                        case "boolean":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = BitConverter.ToBoolean(bytes,0);" + Environment.NewLine;
+                            break;
+                        case "date":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = DateTime.Parse(BitConverter.ToString(bytes,0));" + Environment.NewLine;
+                            break;
+                        case "time":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = TimeSpan.Parse(BitConverter.ToString(bytes,0));" + Environment.NewLine;
+                            break;
+                        case "datetime":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = Convert.ToDateTime(BitConverter.ToString(bytes,0));" + Environment.NewLine;
+                            break;
+                        case "path":
+                            readMothodCode += new string(' ', retractLevel * 4) + "dataItem = @BitConverter.ToString(bytes,0);" + Environment.NewLine;
+                            break;
+                    }
+                    if (element.HasAttribute("VarName"))
+                    {
+                        string VarName = element.GetAttribute("VarName");
+                        readMothodCode += new string(' ', retractLevel * 4) + string.Format("var {0} = dataItem;", VarName) + Environment.NewLine;
+                        VarNameList.Add(VarName);
+                    }
+                    // 生成代码用于将数据加入到数据列表中
+                    readMothodCode += new string(' ', retractLevel * 4) + "objectList.Add(dataItem);" + Environment.NewLine;
+                    retractLevel -= 1;
+                    readMothodCode += new string(' ', retractLevel * 4) + "}" + Environment.NewLine;
                 }
             }
             
@@ -1128,7 +1041,8 @@ namespace AGRP
             code += new string(' ', retractLevel * 4) + "private List<object> objectList = new List<object>();" + Environment.NewLine;
             code += new string(' ', retractLevel * 4) + "private int startReadLocation;" + Environment.NewLine;
             code += new string(' ', retractLevel * 4) + "private int repetition;" + Environment.NewLine;
-            code += new string(' ', retractLevel * 4) + "private int FileLength;" + Environment.NewLine;
+            code += "{3}" + Environment.NewLine;
+
             // Acquire the value of "mode" attribute of rootElement
             string readMode = rootElement.GetAttribute("mode");
             // According to the read mode, generate the corresponding read mothod code
@@ -1139,6 +1053,7 @@ namespace AGRP
                 code += new string(' ', retractLevel * 4) + "BinaryReader autoReader;" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "byte[] bytes;" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "object dataItem;" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "private int FileLength;" + Environment.NewLine;
             }
             else if (readMode == "char")
             {
@@ -1147,6 +1062,9 @@ namespace AGRP
                 code += new string(' ', retractLevel * 4) + "string line;" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "string dataString;" + Environment.NewLine;
                 code += new string(' ', retractLevel * 4) + "object dataItem;" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "int RowLength;" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "int LineLength;" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "int startReadRow;" + Environment.NewLine;
             }
             // Append constructor definition code into code, including access modifier, name of constructor, field name, property type
             code += new string(' ', retractLevel * 4) + "public Reader(string filePath)" + Environment.NewLine;
@@ -1166,6 +1084,8 @@ namespace AGRP
             {
                 // According to the retractLevel, append code into readMothodCode to read file with character mode
                 code += new string(' ', retractLevel * 4) + "allLines = File.ReadAllLines(readFilePath);" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "RowLength = (int) allLines.Length;" + Environment.NewLine;
+                code += new string(' ', retractLevel * 4) + "LineLength = (int) allLines.Length;" + Environment.NewLine;
             }
             // Set retract level as 2
             retractLevel = 2;
@@ -1307,8 +1227,6 @@ namespace AGRP
                 if (readFilePath != string.Empty)
                 {
                     // initialize 
-                    // 筛选出选中的节点
-                    UpdateSequence();
                     DataTableLayoutPanel.Controls.Clear();
                     DataTableLayoutPanel.RowCount = 1;
                     DataHeaderTableLayoutPanel = null;
@@ -1326,13 +1244,15 @@ namespace AGRP
                         }
                         else if (readMode == "char")
                         {
-                            ReadCharaterFile(readFilePath);
+                            ReadCharaterFile(readFilePath, rootNode);
                         }
                     }
+                    /*
                     catch (System.ArgumentOutOfRangeException)
                     {
                         MessageBox.Show("The read location exceeds the file length.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
+                    */
                     catch (System.IndexOutOfRangeException)
                     {
                         MessageBox.Show("The read location exceeds the file length.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1351,83 +1271,81 @@ namespace AGRP
             ReadDataProgressBar.Value = 0;
             ReadDataProgressBar.Maximum = 100;
             ReadDataProgressBar.Minimum = 0;
-            ReadDataProgressBar.Step = 100 / linearSequence.Count();
+            ReadDataProgressBar.Step = 10;
         }
 
         /// <summary>
         /// 读取文本文件
         /// </summary>
         /// <param name="readFilePath"></param>
-        private void ReadCharaterFile(string readFilePath)
+        private void ReadCharaterFile(string readFilePath, TreeNode rootNode)
         {
             string[] allLines = File.ReadAllLines(readFilePath);
-            foreach (XmlElement element in linearSequence)
+            try
             {
-                List<object> dataList = new List<object>();
-                dataList = ReadCharaterData(element, allLines);
-                string elementName = element.GetAttribute("description");
-                // header
-                if (element.HasAttribute("isHeaderElem") || elementName == "Unused")
-                {
-                    addToHeaderTable(elementName, dataList);
-                }
-                // content
-                else
-                {
-                    addToContentTable(elementName, dataList);
-                }
-                ReadDataProgressBar.Value += ReadDataProgressBar.Step;
+                VarsDict.Add("RowLength", (int)allLines.Length);
             }
+            catch
+            {
+            }
+            try
+            {
+                VarsDict.Add("LineLength", 0);
+            }
+            catch
+            {
+                VarsDict["LineLength"] = 0;
+            }
+            ReadCharaterData(rootNode, allLines);
         }
 
         /// <summary>
         /// 读取element代表的文本数据
         /// </summary>
-        /// <param name="element"></param>
-        /// <param name="allLines"></param>
         /// <returns></returns>
-        private List<object> ReadCharaterData(XmlElement element, string[] allLines)
+        private List<object> ReadCharaterData(TreeNode node, string[] allLines)
         {
+            TreeNodeTag tag = (TreeNodeTag)node.Tag;
             List<object> dataList = new List<object>();
-            // Acquire the "name" value of element
-            string elemName = element.Name;
-            // Acquire the "startReadLocation" attribute value of element
-            string startReadLocation = element.GetAttribute("startReadLocation");
-            int startReadRow = int.Parse(startReadLocation.Split(' ')[0]);
-            // 开始读取的列数
-            int startReadColumn = int.Parse(startReadLocation.Split(' ')[1]);
-            // Acquire the "length" attribute value of element
-            int readLength = int.Parse(element.GetAttribute("length").Split(' ')[1]);
-            // Acquire the value of "interval" attribute of element
-            int interval = int.Parse(element.GetAttribute("interval"));
-            // Acquire the value of "repetition" attribute of element
-            int repetition = int.Parse(element.GetAttribute("repetition"));
-            string dataItem = string.Empty;
-            if (element.HasAttribute("targetIndex"))
+            if (node.Nodes.Count > 0)
             {
-                int targetIndex = int.Parse(element.GetAttribute("targetIndex"));
-                startReadRow = startReadRow + interval * (targetIndex - 1);
-                string line = allLines[startReadRow];
-                if (readLength >= 0)
+                foreach (TreeNode childNode in node.Nodes)
                 {
-                    dataItem = line.Substring(startReadColumn, readLength);
+                    dataList.Add(ReadCharaterData(childNode, allLines));
                 }
-                else
-                {
-                    dataItem = line.Substring(startReadColumn, line.Length - startReadColumn);
-                    dataItem = dataItem.Replace("\n", "");
-                    dataItem = dataItem.Replace("\r", "");
-                }
-                dataList.Add(dataItem);
+                return dataList;
             }
             else
             {
-                while (startReadRow < allLines.Length & repetition != 0)
+                // Acquire the "name" value of element
+                string elemName = tag.nodeDes;
+                // Acquire the "startReadLocation" attribute value of element
+                int startReadRow = int.Parse(DynamicCalculation(tag.nodeStartReadRow));
+                int startReadColumn = int.Parse(DynamicCalculation(tag.nodeStartReadColumn));
+                int endReadRow = int.Parse(DynamicCalculation(tag.nodeEndReadRow));
+                int endReadColumn = int.Parse(DynamicCalculation(tag.nodeEndReadRow));
+                // Acquire the "length" attribute value of element
+                int readRowLength = int.Parse(DynamicCalculation(tag.nodeLength.Split(',')[0]));
+                int readColumnLength = int.Parse(DynamicCalculation(tag.nodeLength.Split(',')[1]));
+                // Acquire the value of "repetition" attribute of element
+                float repetition = float.Parse(DynamicCalculation(tag.nodeRepitition));
+                int interval = 1;
+                if (repetition > 1)
                 {
-                    string line = allLines[startReadRow];
-                    if (readLength >= 0)
+                    interval = int.Parse(DynamicCalculation(tag.nodeInterval));
+                }
+
+                string line;
+                string dataItem;
+                if (tag.nodeIndex != "full read")
+                {
+                    int targetIndex = int.Parse(tag.nodeIndex);
+                    startReadRow = startReadRow + interval * (targetIndex - 1);
+                    line = allLines[startReadRow];
+                    VarsDict["LineLength"] = line.Length;
+                    if (readColumnLength >= 0)
                     {
-                        dataItem = line.Substring(startReadColumn, readLength);
+                        dataItem = line.Substring(startReadColumn, readColumnLength);
                     }
                     else
                     {
@@ -1435,9 +1353,66 @@ namespace AGRP
                         dataItem = dataItem.Replace("\n", "");
                         dataItem = dataItem.Replace("\r", "");
                     }
-                    startReadRow += interval;
-                    repetition -= 1;
+
+                    if (tag.nodeElem.HasAttribute("VarName"))
+                    {
+                        try
+                        {
+                            VarsDict.Add(tag.nodeElem.GetAttribute("VarName"), dataItem);
+                        }
+                        catch
+                        {
+                            VarsDict["VarName"] = dataItem;
+                        }
+                    }
                     dataList.Add(dataItem);
+                }
+                else
+                {
+                    while (startReadRow + readRowLength <= allLines.Length && repetition != 0)
+                    {
+                        line = allLines[startReadRow];
+                        VarsDict["LineLength"] = line.Length;
+                        if (readColumnLength >= 0)
+                        {
+                            dataItem = line.Substring(startReadColumn, readColumnLength);
+                        }
+                        else
+                        {
+                            dataItem = line.Substring(startReadColumn, line.Length - startReadColumn);
+                            dataItem = dataItem.Replace("\n", "");
+                            dataItem = dataItem.Replace("\r", "");
+                        }
+                        if (tag.nodeElem.HasAttribute("VarName"))
+                        {
+                            try
+                            {
+                                VarsDict.Add(tag.nodeElem.GetAttribute("VarName"), dataItem);
+                            }
+                            catch
+                            {
+                                VarsDict["VarName"] = dataItem;
+                            }
+                        }
+                        dataList.Add(dataItem);
+                        startReadRow += interval;
+                        repetition -= 1;
+                    }
+                }
+                if (tag.nodeRepitition == "1")
+                {
+                    addToHeaderTable(elemName, dataList);
+                }
+                else
+                {
+                    addToContentTable(elemName, dataList);
+                }
+                try
+                {
+                    ReadDataProgressBar.Value += ReadDataProgressBar.Step;
+                }
+                catch
+                { 
                 }
             }
             return dataList;
@@ -1688,17 +1663,20 @@ namespace AGRP
             else
             {
                 // Acquire the "name" value of element
-                string elemName = tag.nodeName;
+                string elemName = tag.nodeDes;
                 // Acquire the "startReadLocation" attribute value of element
                 int startReadLocation = int.Parse(DynamicCalculation(tag.nodeStartLocation));
                 // Acquire the "length" attribute value of element
                 int readLength = int.Parse(DynamicCalculation(tag.nodeLength));
 
-                // Acquire the value of "interval" attribute of element
-                int interval = int.Parse(DynamicCalculation(tag.nodeInterval));
-
                 // Acquire the value of "repetition" attribute of element
                 float repetition = float.Parse(DynamicCalculation(tag.nodeRepitition));
+                int interval = 1;
+                if (repetition > 1)
+                {
+                    interval = int.Parse(DynamicCalculation(tag.nodeInterval));
+                }
+
                 byte[] bytes;
                 object dataItem;
                 if (tag.nodeIndex != "full read")
@@ -1712,7 +1690,7 @@ namespace AGRP
                     {
                         Array.Reverse(bytes);
                     }
-                    switch (tag.nodeType)
+                    switch (tag.nodeName)
                     {
                         case "string":
                             dataItem = BitConverter.ToString(bytes);
@@ -1766,7 +1744,7 @@ namespace AGRP
                         {
                             Array.Reverse(bytes);
                         }
-                        switch (tag.nodeType)
+                        switch (tag.nodeName)
                         {
                             case "string":
                                 dataItem = BitConverter.ToString(bytes);
@@ -1812,7 +1790,7 @@ namespace AGRP
                         repetition -= 1;
                     }
                 }
-                if (dataList.Count == 1)
+                if (tag.nodeRepitition == "1")
                 {
                     addToHeaderTable(elemName, dataList);
                 }
@@ -1820,7 +1798,14 @@ namespace AGRP
                 {
                     addToContentTable(elemName, dataList);
                 }
-                ReadDataProgressBar.Value += ReadDataProgressBar.Step;
+                try
+                {
+                    ReadDataProgressBar.Value += ReadDataProgressBar.Step;
+                }
+                catch
+                { 
+                }
+                
             }
             return dataList;
         }
@@ -1868,13 +1853,13 @@ namespace AGRP
                 treeNode = DFMLTreeView.Nodes.Add(rootName);
                 treeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
                 treeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
-                treeNode.Tag = new TreeNodeTag(rootElement);
+                string readMode = rootElement.GetAttribute("mode");
+                treeNode.Tag = new TreeNodeTag(rootElement, readMode);
                 TreeNodeTag rootTag = (TreeNodeTag)treeNode.Tag;
-                rootTag.nodeLength = "FileLength";
                 //treeNode.Name = rootElement.GetAttribute("ID");
                 foreach (XmlElement childElem in rootElement)
                 {
-                    CreatChildTree(treeNode, childElem);
+                    CreatChildTree(treeNode, childElem,readMode);
                 }
                 checkedAllNodes(DFMLTreeView.Nodes);
                 DFMLTreeView.ExpandAll();
@@ -1882,81 +1867,169 @@ namespace AGRP
             }
         }
 
-        private void CreatChildTree(TreeNode treeNode, XmlElement childElem)
+        private void CreatChildTree(TreeNode treeNode, XmlElement childElem, string readMode)
         {
-            if (basicDataType.Contains(childElem.Name) || childElem.Name == "group")
+            TreeNodeTag parentNodeTag = (TreeNodeTag)treeNode.Tag;
+            string chilElemDescription = childElem.GetAttribute("description");
+            if (! childElem.HasAttribute("location"))
             {
-                TreeNodeTag parentNodeTag = (TreeNodeTag)treeNode.Tag;
-                string chilElemDescription = childElem.GetAttribute("description");
-                TreeNode childTreeNode = treeNode.Nodes.Add(chilElemDescription);
-                //childTreeNode.Name = childElem.GetAttribute("ID");
-                
-                childTreeNode.Tag = new TreeNodeTag(childElem);
-                TreeNodeTag nodeTag = (TreeNodeTag)childTreeNode.Tag;
+                return;
+            }
+            TreeNode childTreeNode = treeNode.Nodes.Add(chilElemDescription);
+            childTreeNode.Tag = new TreeNodeTag(childElem, readMode);
+            TreeNodeTag nodeTag = (TreeNodeTag)childTreeNode.Tag;
+            if (parentNodeTag.nodeElem.HasAttribute("interval"))
+            {
+                nodeTag.nodeInterval = parentNodeTag.nodeElem.GetAttribute("interval");
+            }
+            if (readMode == "byte")
+            {
+                if (basicDataType.Contains(childElem.Name) || childElem.Name == "group")
+                {
+                    if (parentNodeTag.nodeName == "group")
+                    {
+                        try
+                        {
+                            nodeTag.nodeStartLocation = (int.Parse(nodeTag.nodeStartLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
+                        }
+                        catch
+                        {
+                            nodeTag.nodeStartLocation = string.Format("({0})+({1})", nodeTag.nodeStartLocation, parentNodeTag.nodeStartLocation);
+                        }
+                        try
+                        {
+                            if (parentNodeTag.nodeStartLocation == "-1")
+                            {
+                                nodeTag.nodeEndLocation = "-1";
+                            }
+                            else 
+                            {
+                                nodeTag.nodeEndLocation = (int.Parse(nodeTag.nodeEndLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
+                            }
+                        }
+                        catch
+                        {
+                            nodeTag.nodeEndLocation = string.Format("({0})+({1})", nodeTag.nodeEndLocation, parentNodeTag.nodeStartLocation);
+                        }
+                    }
 
-                if (parentNodeTag.nodeType == "group")
-                {
-                    try
-                    {
-                        nodeTag.nodeStartLocation = (int.Parse(nodeTag.nodeStartLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
-                    }
-                    catch
-                    {
-                        nodeTag.nodeStartLocation = string.Format("({0})+({1})", nodeTag.nodeStartLocation, parentNodeTag.nodeStartLocation);
-                    }
-                    try
-                    {
-                        nodeTag.nodeEndLocation = (int.Parse(nodeTag.nodeEndLocation) + int.Parse(parentNodeTag.nodeStartLocation)).ToString();
-                    }
-                    catch
-                    {
-                        nodeTag.nodeEndLocation = string.Format("({0})+({1})", nodeTag.nodeEndLocation, parentNodeTag.nodeStartLocation);
-                    }
-                }
-
-                string childElemRepitition = "1";
-                if (parentNodeTag.nodeName == "dataformat")
-                {
-                    childElemRepitition = "1";
-                }
-                else
-                {
-                    try
-                    {
-                        childElemRepitition = (int.Parse(parentNodeTag.nodeLength) / int.Parse(parentNodeTag.nodeInterval)).ToString();
-                    }
-                    catch
-                    {
-                        childElemRepitition = string.Format("({0}/ {1})", parentNodeTag.nodeLength, parentNodeTag.nodeInterval);
-                    }
-                }
-                foreach (XmlElement brotherElem in parentNodeTag.nodeElem.ChildNodes)
-                {
-                    string locationAtt = brotherElem.GetAttribute("location");
-                    if (locationAtt.Split(',')[1] == "-1")
+                    string childElemRepitition = "1";
+                    if (parentNodeTag.nodeName == "dataformat")
                     {
                         childElemRepitition = "1";
-                        break;
-                      }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            childElemRepitition = (int.Parse(parentNodeTag.nodeLength) / int.Parse(parentNodeTag.nodeInterval)).ToString();
+                        }
+                        catch
+                        {
+                            childElemRepitition = string.Format("({0}/ {1})", parentNodeTag.nodeLength, parentNodeTag.nodeInterval);
+                        }
+                    }
+                    foreach (XmlElement brotherElem in parentNodeTag.nodeElem.ChildNodes)
+                    {
+                        string locationAtt = brotherElem.GetAttribute("location");
+                        if (locationAtt.Split(',')[1] == "-1")
+                        {
+                            childElemRepitition = "1";
+                            break;
+                        }
+                    }
+                    nodeTag.nodeRepitition = childElemRepitition;
                 }
-                nodeTag.nodeRepitition = childElemRepitition;
-                if (chilElemDescription == string.Empty)
+            }
+            else if (readMode == "char")
+            {
+                if (basicDataType.Contains(childElem.Name) || childElem.Name == "group")
                 {
-                    chilElemDescription = childElem.Name;
-                }
-                if (childElem.Name == "group")
-                {
-                    childTreeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
-                }
-                else
-                {
-                    childTreeNode.NodeFont = new Font("Times New Roman", 9);
-                }
+                    if (parentNodeTag.nodeName == "group")
+                    {
+                        try
+                        {
+                            nodeTag.nodeStartReadRow = (int.Parse(nodeTag.nodeStartReadRow) + int.Parse(parentNodeTag.nodeStartReadRow)).ToString();
+                            nodeTag.nodeStartReadColumn = (int.Parse(nodeTag.nodeStartReadColumn) + int.Parse(parentNodeTag.nodeStartReadColumn)).ToString();
+                        }
+                        catch
+                        {
+                            nodeTag.nodeStartReadRow = string.Format("({0})+({1})", nodeTag.nodeStartReadRow, parentNodeTag.nodeStartReadRow);
+                            nodeTag.nodeStartReadColumn = string.Format("({0})+({1})", nodeTag.nodeStartReadColumn, parentNodeTag.nodeStartReadColumn);
+                        }
+                        try
+                        {
+                            if (parentNodeTag.nodeStartReadRow == "-1")
+                            {
+                                nodeTag.nodeEndReadRow = "-1";
+                            }
+                            else
+                            {
+                                nodeTag.nodeEndReadRow = (int.Parse(nodeTag.nodeEndReadRow) + int.Parse(parentNodeTag.nodeStartReadRow)).ToString();
+                            }
+                            if (parentNodeTag.nodeStartReadColumn == "-1")
+                            {
+                                nodeTag.nodeEndReadColumn = "-1";
+                            }
+                            else
+                            {
+                                nodeTag.nodeEndReadColumn = (int.Parse(nodeTag.nodeEndReadColumn) + int.Parse(parentNodeTag.nodeStartReadColumn)).ToString();
+                            }
+                        }
+                        catch
+                        {
+                            nodeTag.nodeEndReadRow = (int.Parse(nodeTag.nodeEndReadRow) + int.Parse(parentNodeTag.nodeEndReadRow)).ToString();
+                            nodeTag.nodeEndReadColumn = (int.Parse(nodeTag.nodeEndReadColumn) + int.Parse(parentNodeTag.nodeEndReadColumn)).ToString();
+                        }
+                    }
 
-                foreach (XmlElement grandChildElem in childElem.ChildNodes)
-                {
-                    CreatChildTree(childTreeNode, grandChildElem);
+                    string childElemRepitition = "1";
+                    if (parentNodeTag.nodeName == "dataformat")
+                    {
+                        childElemRepitition = "1";
+                    }
+                    else
+                    {
+                        try
+                        {
+                            childElemRepitition = (int.Parse(parentNodeTag.nodeLength.Split(',')[0]) / int.Parse(parentNodeTag.nodeInterval)).ToString();
+                        }
+                        catch
+                        {
+                            childElemRepitition = string.Format("({0}/ {1})", parentNodeTag.nodeLength.Split(',')[0], parentNodeTag.nodeInterval);
+                        }
+                    }
+                    foreach (XmlElement brotherElem in parentNodeTag.nodeElem.ChildNodes)
+                    {
+                        if (brotherElem.HasAttribute("location"))
+                        {
+                            string locationAtt = brotherElem.GetAttribute("location");
+                            if (locationAtt.Split(',')[1].Split(' ')[0] == "-1")
+                            {
+                                childElemRepitition = "1";
+                                break;
+                            }
+                        }
+                    }
+                    nodeTag.nodeRepitition = childElemRepitition;
                 }
+            }
+            if (chilElemDescription == string.Empty)
+            {
+                chilElemDescription = childElem.Name;
+            }
+            if (childElem.Name == "group")
+            {
+                childTreeNode.NodeFont = new Font("Times New Roman", 9, System.Drawing.FontStyle.Bold);
+            }
+            else
+            {
+                childTreeNode.NodeFont = new Font("Times New Roman", 9);
+            }
+
+            foreach (XmlElement grandChildElem in childElem.ChildNodes)
+            {
+                CreatChildTree(childTreeNode, grandChildElem, readMode);
             }
         }
 
@@ -1974,60 +2047,22 @@ namespace AGRP
         //    }
         //}
 
-        /// <summary>
-        /// 根据选中的子节点，更新线性序列
-        /// </summary>
-        private void UpdateSequence()
-        {
-            linearSequence.Clear();
-            // 获取所有被选中的叶子节点
-            GetAllCheckedLeafNodes(DFMLTreeView.Nodes, linearSequence);
-        }
-
-        ///// <summary>
-        ///// 为线性序列中
-        ///// </summary>
-        ///// <param name="linearSequence"></param>
-        //private void SetRandomRead(List<XmlElement> linearSequence)
-        //{
-        //    foreach (XmlElement element in linearSequence)
-        //    {
-        //        TreeNode targetNode = FindNodeByTag(element.GetAttribute("tag"),DFMLTreeView.Nodes);
-        //        if (targetNode != null)
-        //        {
-        //            try
-        //            {
-        //                string targetIndex = Regex.Split(targetNode.Text, "   ", RegexOptions.IgnoreCase)[1];
-        //                // 去除左右括号
-        //                targetIndex = targetIndex.Replace("(", "");
-        //                targetIndex = targetIndex.Replace(")", "");
-        //                element.SetAttribute("targetIndex", targetIndex);
-        //            }
-        //            catch
-        //            {
-
-        //            }
-        //        }
-        //    }
-        //}
 
         /// <summary>
         /// 获取所有被选中的叶子节点
         /// </summary>
         /// <param name="nodes"></param>
-        /// <param name="linearSequence"></param>
-        private void GetAllCheckedLeafNodes(TreeNodeCollection nodes, List<XmlElement> linearSequence)
+        private void GetAllCheckedLeafNodes(TreeNodeCollection nodes)
         {
             foreach (TreeNode node in nodes)
             {
                 TreeNodeTag Tag = (TreeNodeTag)node.Tag;
                 if(node.Nodes.Count == 0 && node.Checked == true)
                 {
-                    linearSequence.Add(Tag.nodeElem);
                 }
                 else
                 {
-                    GetAllCheckedLeafNodes(node.Nodes, linearSequence);
+                    GetAllCheckedLeafNodes(node.Nodes);
                 }
             }
         }
@@ -2103,7 +2138,7 @@ namespace AGRP
         {
             TreeNodeTag Tag = (TreeNodeTag) node.Tag;
             Tag.nodeIndex = targetIndex;
-            string nodeName = Tag.nodeName;
+            string nodeName = Tag.nodeDes;
             XmlElement nodeElem = (XmlElement) Tag.nodeElem;
             if (targetIndex == "full read")
             {
@@ -2166,14 +2201,7 @@ namespace AGRP
             addToRandomInfoTable("", randomSelectNodeForm);
             string elementType = tag.nodeElem.Name;
             addToRandomInfoTable("Type: " + elementType, randomSelectNodeForm);
-            try
-            {
-                randomSelectNodeForm.maxRepetition = int.Parse(tag.nodeRepitition);
-            }
-            catch
-            {
-                randomSelectNodeForm.maxRepetition = 1;
-            }
+            randomSelectNodeForm.maxRepetition = tag.nodeRepitition;
             addToRandomInfoTable("Occurrence times: " + randomSelectNodeForm.maxRepetition, randomSelectNodeForm);
             
             randomSelectNodeForm.ShowDialog();
@@ -2365,35 +2393,57 @@ namespace AGRP
     /// </summary>
     class TreeNodeTag
     {
-        public string nodeType;
+        public string nodeDes;
         public string nodeName;
         public XmlElement nodeElem;
         public string nodeLength;
         public string nodeRepitition;
-        public string nodeInterval = "FileLength";
+        public string nodeInterval;
         public string nodeIndex;
         public string nodeStartLocation;
         public string nodeEndLocation;
-        public TreeNodeTag(XmlElement nodeElem)
+        public string nodeStartReadRow;
+        public string nodeStartReadColumn;
+        public string nodeEndReadRow;
+        public string nodeEndReadColumn;
+        public TreeNodeTag(XmlElement nodeElem,string readMode)
         {
-            this.nodeType = nodeElem.Name;
+            this.nodeName = nodeElem.Name;
             this.nodeIndex = "full read";
             this.nodeRepitition = "1";
            
             if (nodeElem.HasAttribute("description"))
             {
-                this.nodeName = nodeElem.GetAttribute("description");
+                this.nodeDes = nodeElem.GetAttribute("description");
             }
             else
             {
-                this.nodeName = "dataformat";
+                this.nodeDes = "dataformat";
             }
             this.nodeElem = nodeElem;
             string locationAtt = nodeElem.GetAttribute("location");
             // Parse the start and end location form locationAtt
             this.nodeStartLocation = locationAtt.Split(',')[0];
             this.nodeEndLocation = locationAtt.Split(',')[1];
-            this.nodeLength = CalculatLength(this.nodeStartLocation, this.nodeEndLocation);
+            if (readMode == "char")
+            {
+                nodeInterval = "RowLength";
+                // 开始读取的行数
+                this.nodeStartReadRow = nodeStartLocation.Split(' ')[0];
+                // 开始读取的列数
+                this.nodeStartReadColumn = nodeStartLocation.Split(' ')[1];
+                // 结束读取的行数
+                this.nodeEndReadRow = nodeEndLocation.Split(' ')[0];
+                // 结束读取的列数
+                this.nodeEndReadColumn = nodeEndLocation.Split(' ')[1];
+                this.nodeLength = CalculatLength(this.nodeStartLocation, this.nodeEndLocation, "char");
+            }
+            else if (readMode == "byte")
+            {
+                nodeInterval = "FileLength";
+                this.nodeLength = CalculatLength(this.nodeStartLocation, this.nodeEndLocation, "byte");
+            }
+
 
             if (nodeElem.HasAttribute("interval"))
             {
@@ -2416,33 +2466,84 @@ namespace AGRP
                         string chilnodeEndLocation = childLocation.Split(',')[1];
                         try
                         {
-                            this.nodeInterval = (int.Parse(this.nodeInterval) + int.Parse(CalculatLength(childnodeStartLocation, chilnodeEndLocation))).ToString();
+                            if (readMode == "byte")
+                            {
+                                this.nodeInterval = (int.Parse(this.nodeInterval) + int.Parse(CalculatLength(childnodeStartLocation, chilnodeEndLocation, readMode))).ToString();
+                            }
+                            else
+                            {
+                                this.nodeInterval = (int.Parse(this.nodeInterval) + int.Parse(CalculatLength(childnodeStartLocation, chilnodeEndLocation, readMode).Split(',')[0])).ToString();
+                            }
                         }
                         catch
                         {
-                            this.nodeInterval = string.Format("({0}+{1})", this.nodeInterval, CalculatLength(childnodeStartLocation, chilnodeEndLocation));
+                            if (readMode == "byte")
+                            {
+                                this.nodeInterval = string.Format("({0}+{1})", this.nodeInterval, CalculatLength(childnodeStartLocation, chilnodeEndLocation, readMode));
+                            }
+                            else
+                            {
+                                this.nodeInterval = string.Format("({0}+{1})", this.nodeInterval, CalculatLength(childnodeStartLocation, chilnodeEndLocation, readMode).Split(',')[0]);
+                            }
                         }
                     }
                 }
-                else
-                {
-                    this.nodeInterval = this.nodeLength;
-                }
             }
         }
-        public string CalculatLength(string startLocation, string endLocation)
+        public string CalculatLength(string startLocation, string endLocation, string readMode = "byte")
         {
-            if (endLocation == "-1")
+            if (readMode == "byte")
             {
-                endLocation = "FileLength";
+                if (endLocation == "-1")
+                {
+                    endLocation = "FileLength";
+                }
+                try
+                {
+                    return (int.Parse(endLocation) - int.Parse(startLocation)).ToString();
+                }
+                catch
+                {
+                    return string.Format("({0}-({1}))", endLocation, startLocation);
+                }
             }
-            try
+            else
             {
-                return (int.Parse(endLocation) - int.Parse(startLocation)).ToString();
-            }
-            catch
-            {
-                return string.Format("({0}-({1}))", endLocation, startLocation);
+                string rowLength = "0";
+                string columLength = "0";
+                // 开始读取的行数
+                string StartReadRow = nodeStartLocation.Split(' ')[0];
+                // 开始读取的列数
+                string StartReadColumn = nodeStartLocation.Split(' ')[1];
+                // 结束读取的行数
+                string EndReadRow = nodeEndLocation.Split(' ')[0];
+                // 结束读取的列数
+                string EndReadColumn = nodeEndLocation.Split(' ')[1];
+                if (EndReadRow == "-1")
+                {
+                    EndReadRow = "RowLength";
+                }
+                if (EndReadColumn == "-1")
+                {
+                    EndReadColumn = "LineLength";
+                }
+                try
+                {
+                    rowLength = (int.Parse(EndReadRow) - int.Parse(StartReadRow)).ToString();
+                }
+                catch
+                {
+                    rowLength = string.Format("({0}-({1}))", EndReadRow, StartReadRow);
+                }
+                try
+                {
+                    columLength = (int.Parse(EndReadColumn) - int.Parse(StartReadColumn)).ToString();
+                }
+                catch
+                {
+                    columLength = string.Format("({0}-({1}))", EndReadColumn, StartReadColumn);
+                }
+                return string.Format("{0},{1}", rowLength, columLength);
             }
         }
     }

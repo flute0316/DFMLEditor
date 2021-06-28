@@ -12,7 +12,7 @@ namespace AGRP
 {
     public partial class RandomReadForm : Form
     {
-        public int maxRepetition;
+        public string maxRepetition;
         public string indexResult;
         public TreeNode selectedNode;
         public RandomReadForm()
@@ -39,17 +39,27 @@ namespace AGRP
             {
                 MessageBox.Show("Please enter the index of data you want to read", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            else if (maxRepetition == -1 || int.Parse(IndexBox.Text) <= maxRepetition && int.Parse(IndexBox.Text) >= 0)
+            else
             {
-                this.Close();
-            }
-            else if (int.Parse(IndexBox.Text) < 0)
-            {
-                MessageBox.Show("The input index cannot be less than 0", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            else if (int.Parse(IndexBox.Text) > maxRepetition)
-            {
-                MessageBox.Show("The input index cannot be greater than the maxRepetition", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try
+                {
+                    if (int.Parse(IndexBox.Text) <= int.Parse(maxRepetition) && int.Parse(IndexBox.Text) >= 0)
+                    {
+                        this.Close();
+                    }
+                    else if (int.Parse(IndexBox.Text) < 0)
+                    {
+                        MessageBox.Show("The input index cannot be less than 0", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    else if (int.Parse(IndexBox.Text) > int.Parse(maxRepetition))
+                    {
+                        MessageBox.Show("The input index cannot be greater than the maxRepetition", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                catch
+                {
+                    this.Close();
+                }
             }
             indexResult = IndexBox.Text;
         }

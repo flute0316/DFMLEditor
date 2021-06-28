@@ -24,7 +24,7 @@
     <semicolon  description="Annotator" location="2 0,2 2"></semicolon>
     <string description="Separator" value="=" location="2 2,2 -1"></string>
     <cr></cr>
-    <group description="Content" location="3 0,-1 -1">
+    <group description="Content" location="3 0,-1 -1" interval="1">
         <string description="Name" location="0 0,0 6"></string>
         <tab></tab>
         <string description="Rgage" location="0 10,0 18"></string>
